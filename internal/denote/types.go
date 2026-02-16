@@ -25,6 +25,12 @@ const (
 	MaturityRun   = "run"
 )
 
+// Kind constants (orthogonal to state and maturity).
+const (
+	KindAspiration = "aspiration"
+	KindBelief     = "belief"
+)
+
 // Type constant.
 const TypeIdea = "idea"
 
@@ -99,6 +105,7 @@ type IdeaMetadata struct {
 	Title          string   `yaml:"title" json:"title"`
 	IndexID        int      `yaml:"index_id" json:"index_id"`
 	Type           string   `yaml:"type,omitempty" json:"type,omitempty"`
+	Kind           string   `yaml:"kind,omitempty" json:"kind,omitempty"`
 	State          string   `yaml:"state,omitempty" json:"state,omitempty"`
 	Maturity       string   `yaml:"maturity,omitempty" json:"maturity,omitempty"`
 	Tags           []string `yaml:"tags,omitempty" json:"tags,omitempty"`
@@ -170,10 +177,58 @@ func ValidateStateTransition(from, to string) error {
 	return fmt.Errorf("transition from %q to %q is not allowed", from, to)
 }
 
+// IsValidKind checks if a kind value is valid.
+func IsValidKind(kind string) bool {
+	switch kind {
+	case KindAspiration, KindBelief:
+		return true
+	}
+	return false
+}
+
+// displayLabels maps canonical states to kind-specific display labels.
+// Only states that differ between kinds are listed.
+var displayLabels = map[string]map[string]string{
+	KindBelief: {
+		StateActive:      "considering",
+		StateIterating:   "reconsidering",
+		StateImplemented: "accepted",
+	},
+}
+
+// DisplayState returns the kind-specific display label for a canonical state.
+func DisplayState(canonical, kind string) string {
+	if kindMap, ok := displayLabels[kind]; ok {
+		if label, ok := kindMap[canonical]; ok {
+			return label
+		}
+	}
+	return canonical
+}
+
+// ResolveDisplayState converts a display label (possibly kind-specific) back
+// to the canonical state value. Returns the canonical state and the kind it
+// belongs to (empty string if the label is shared or already canonical).
+func ResolveDisplayState(display string) (canonical string, matchedKind string) {
+	if IsValidState(display) {
+		return display, ""
+	}
+	for canonical, label := range displayLabels[KindBelief] {
+		if label == display {
+			return canonical, KindBelief
+		}
+	}
+	return display, ""
+}
+
 // ValidateIdea checks business rules for an idea.
 func ValidateIdea(idea *Idea) error {
 	if idea.State != "" && !IsValidState(idea.State) {
 		return fmt.Errorf("invalid state: %s", idea.State)
+	}
+
+	if idea.Kind != "" && !IsValidKind(idea.Kind) {
+		return fmt.Errorf("invalid kind: %s (use aspiration or belief)", idea.Kind)
 	}
 
 	if idea.Maturity != "" && !IsValidMaturity(idea.Maturity) {

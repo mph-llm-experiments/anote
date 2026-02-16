@@ -9,7 +9,10 @@ import (
 )
 
 // CreateIdea creates a new idea file with YAML frontmatter.
-func CreateIdea(dir, title string, tags []string) (*denote.Idea, error) {
+func CreateIdea(dir, title string, tags []string, kind string) (*denote.Idea, error) {
+	if kind == "" {
+		kind = denote.KindAspiration
+	}
 	counter, err := denote.GetIDCounter(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ID counter: %w", err)
@@ -41,6 +44,7 @@ func CreateIdea(dir, title string, tags []string) (*denote.Idea, error) {
 		Title:   title,
 		IndexID: indexID,
 		Type:    denote.TypeIdea,
+		Kind:    kind,
 		State:   denote.StateSeed,
 		Tags:    tags,
 		Created: now.Format(time.RFC3339),

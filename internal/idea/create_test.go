@@ -15,7 +15,7 @@ func TestCreateIdea_Basic(t *testing.T) {
 
 	dir := t.TempDir()
 
-	idea, err := CreateIdea(dir, "My test idea", nil)
+	idea, err := CreateIdea(dir, "My test idea", nil, "")
 	if err != nil {
 		t.Fatalf("CreateIdea: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestCreateIdea_IdeaTagAlwaysInFilename(t *testing.T) {
 
 	dir := t.TempDir()
 
-	idea, err := CreateIdea(dir, "Tag test", nil)
+	idea, err := CreateIdea(dir, "Tag test", nil, "")
 	if err != nil {
 		t.Fatalf("CreateIdea: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestCreateIdea_WithTags(t *testing.T) {
 
 	dir := t.TempDir()
 
-	idea, err := CreateIdea(dir, "Tagged idea", []string{"coaching", "leadership"})
+	idea, err := CreateIdea(dir, "Tagged idea", []string{"coaching", "leadership"}, "")
 	if err != nil {
 		t.Fatalf("CreateIdea: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestCreateIdea_IdeaTagNotDuplicated(t *testing.T) {
 	dir := t.TempDir()
 
 	// Pass "idea" as a user tag — should not appear twice in filename
-	idea, err := CreateIdea(dir, "Dedup test", []string{"idea", "coaching"})
+	idea, err := CreateIdea(dir, "Dedup test", []string{"idea", "coaching"}, "")
 	if err != nil {
 		t.Fatalf("CreateIdea: %v", err)
 	}
@@ -111,17 +111,17 @@ func TestCreateIdea_SequentialIDs(t *testing.T) {
 
 	dir := t.TempDir()
 
-	idea1, err := CreateIdea(dir, "First", nil)
+	idea1, err := CreateIdea(dir, "First", nil, "")
 	if err != nil {
 		t.Fatalf("CreateIdea 1: %v", err)
 	}
 
-	idea2, err := CreateIdea(dir, "Second", nil)
+	idea2, err := CreateIdea(dir, "Second", nil, "")
 	if err != nil {
 		t.Fatalf("CreateIdea 2: %v", err)
 	}
 
-	idea3, err := CreateIdea(dir, "Third", nil)
+	idea3, err := CreateIdea(dir, "Third", nil, "")
 	if err != nil {
 		t.Fatalf("CreateIdea 3: %v", err)
 	}
@@ -137,13 +137,49 @@ func TestCreateIdea_SequentialIDs(t *testing.T) {
 	}
 }
 
+func TestCreateIdea_WithKind(t *testing.T) {
+	denote.ResetSingleton()
+	defer denote.ResetSingleton()
+
+	dir := t.TempDir()
+
+	idea, err := CreateIdea(dir, "Chaos is unsustainable", nil, "belief")
+	if err != nil {
+		t.Fatalf("CreateIdea: %v", err)
+	}
+
+	if idea.Kind != denote.KindBelief {
+		t.Errorf("Kind: got %q, want %q", idea.Kind, denote.KindBelief)
+	}
+
+	if idea.State != denote.StateSeed {
+		t.Errorf("State: got %q, want %q", idea.State, denote.StateSeed)
+	}
+}
+
+func TestCreateIdea_DefaultKind(t *testing.T) {
+	denote.ResetSingleton()
+	defer denote.ResetSingleton()
+
+	dir := t.TempDir()
+
+	idea, err := CreateIdea(dir, "Build a widget", nil, "")
+	if err != nil {
+		t.Fatalf("CreateIdea: %v", err)
+	}
+
+	if idea.Kind != denote.KindAspiration {
+		t.Errorf("Kind: got %q, want %q", idea.Kind, denote.KindAspiration)
+	}
+}
+
 func TestCreateIdea_DenoteFilenameFormat(t *testing.T) {
 	denote.ResetSingleton()
 	defer denote.ResetSingleton()
 
 	dir := t.TempDir()
 
-	idea, err := CreateIdea(dir, "My Great Idea", nil)
+	idea, err := CreateIdea(dir, "My Great Idea", nil, "")
 	if err != nil {
 		t.Fatalf("CreateIdea: %v", err)
 	}

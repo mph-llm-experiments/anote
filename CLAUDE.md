@@ -4,15 +4,15 @@
 anote is a CLI tool for managing ideas using the Denote file naming convention. It is a sibling to [atask](../atask/), sharing file format conventions but with semantics for **thinking** rather than **doing**.
 
 ## Project Status
-**Phase: v0.1.0 — Core CLI Complete**
-- Spec: `docs/ANOTE_SPEC.md` (v0.1.0)
+**Phase: v0.2.0 — Kind Dimension Added**
+- Spec: `docs/ANOTE_SPEC.md` (v0.2.0)
 - Language: Go (to match atask)
 - All core commands implemented: new, list, show, update, reject, tag, link, project
 - Agent skill: `~/.claude/skills/anote/SKILL.md`
 - Test suite: 40+ unit tests across denote, idea, and config packages
 
 ## Key Design Decisions
-1. **Two orthogonal dimensions**: State (lifecycle) and Maturity (how baked) — see spec
+1. **Three orthogonal dimensions**: State (lifecycle), Maturity (how baked), Kind (aspiration vs belief) — see spec
 2. **Denote file naming**: `YYYYMMDDTHHMMSS--title-slug__idea_tag1_tag2.md`
 3. **Required `idea` tag** in filename (like `task`/`project` in atask)
 4. **Rejected state requires a reason** — agent must enforce this
@@ -44,6 +44,11 @@ anote/
 │   └── ANOTE_SPEC.md
 └── CLAUDE.md
 ```
+
+## Kind Values
+`aspiration` (default) | `belief`
+
+Display labels differ by kind: aspirations use active/iterating/implemented; beliefs use considering/reconsidering/accepted. Canonical state stored in YAML regardless.
 
 ## State Values
 `seed` → `draft` → `active` ↔ `iterating` → `implemented` | `archived` | `rejected` | `dropped`

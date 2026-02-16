@@ -127,6 +127,118 @@ func TestValidateIdea(t *testing.T) {
 	}
 }
 
+func TestIsValidKind(t *testing.T) {
+	valid := []string{"aspiration", "belief"}
+	for _, k := range valid {
+		if !IsValidKind(k) {
+			t.Errorf("expected %q to be valid kind", k)
+		}
+	}
+
+	invalid := []string{"", "thought", "Aspiration", "BELIEF", "idea"}
+	for _, k := range invalid {
+		if IsValidKind(k) {
+			t.Errorf("expected %q to be invalid kind", k)
+		}
+	}
+}
+
+func TestDisplayState(t *testing.T) {
+	tests := []struct {
+		canonical string
+		kind      string
+		want      string
+	}{
+		// Aspiration labels are the same as canonical
+		{"active", KindAspiration, "active"},
+		{"iterating", KindAspiration, "iterating"},
+		{"implemented", KindAspiration, "implemented"},
+		{"seed", KindAspiration, "seed"},
+
+		// Belief labels differ for 3 states
+		{"active", KindBelief, "considering"},
+		{"iterating", KindBelief, "reconsidering"},
+		{"implemented", KindBelief, "accepted"},
+
+		// Shared labels pass through for beliefs
+		{"seed", KindBelief, "seed"},
+		{"draft", KindBelief, "draft"},
+		{"archived", KindBelief, "archived"},
+		{"rejected", KindBelief, "rejected"},
+		{"dropped", KindBelief, "dropped"},
+
+		// Empty kind defaults to canonical (aspiration)
+		{"active", "", "active"},
+		{"implemented", "", "implemented"},
+	}
+
+	for _, tt := range tests {
+		got := DisplayState(tt.canonical, tt.kind)
+		if got != tt.want {
+			t.Errorf("DisplayState(%q, %q): got %q, want %q", tt.canonical, tt.kind, got, tt.want)
+		}
+	}
+}
+
+func TestResolveDisplayState(t *testing.T) {
+	tests := []struct {
+		display      string
+		wantCanon    string
+		wantKind     string
+	}{
+		// Belief-specific labels resolve back
+		{"considering", "active", KindBelief},
+		{"reconsidering", "iterating", KindBelief},
+		{"accepted", "implemented", KindBelief},
+
+		// Canonical states pass through with empty kind
+		{"active", "active", ""},
+		{"iterating", "iterating", ""},
+		{"implemented", "implemented", ""},
+		{"seed", "seed", ""},
+		{"draft", "draft", ""},
+		{"archived", "archived", ""},
+		{"rejected", "rejected", ""},
+		{"dropped", "dropped", ""},
+
+		// Unknown labels pass through
+		{"bogus", "bogus", ""},
+	}
+
+	for _, tt := range tests {
+		canon, kind := ResolveDisplayState(tt.display)
+		if canon != tt.wantCanon || kind != tt.wantKind {
+			t.Errorf("ResolveDisplayState(%q): got (%q, %q), want (%q, %q)",
+				tt.display, canon, kind, tt.wantCanon, tt.wantKind)
+		}
+	}
+}
+
+func TestValidateIdea_Kind(t *testing.T) {
+	// Valid kind
+	i := &Idea{}
+	i.State = StateSeed
+	i.Kind = KindBelief
+	if err := ValidateIdea(i); err != nil {
+		t.Errorf("expected no error for valid kind, got: %v", err)
+	}
+
+	// Invalid kind
+	i2 := &Idea{}
+	i2.State = StateSeed
+	i2.Kind = "thought"
+	if err := ValidateIdea(i2); err == nil {
+		t.Error("expected error for invalid kind")
+	}
+
+	// Empty kind is valid (defaults to aspiration)
+	i3 := &Idea{}
+	i3.State = StateSeed
+	if err := ValidateIdea(i3); err != nil {
+		t.Errorf("expected no error for empty kind, got: %v", err)
+	}
+}
+
 func TestHasTag(t *testing.T) {
 	f := &File{Tags: []string{"idea", "coaching", "leadership"}}
 

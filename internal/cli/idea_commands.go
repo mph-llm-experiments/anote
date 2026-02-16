@@ -27,7 +27,7 @@ func (t *tagList) Set(value string) error {
 func ideaNewCommand(cfg *config.Config) *Command {
 	cmd := &Command{
 		Name:        "new",
-		Usage:       "anote new [--tag TAG]... <title>",
+		Usage:       "anote new [--tag TAG]... [--kind KIND] <title>",
 		Description: "Create a new idea",
 	}
 
@@ -35,9 +35,13 @@ func ideaNewCommand(cfg *config.Config) *Command {
 		// Manual flag parsing to allow: new "title" --tag X or new --tag X "title"
 		var tags []string
 		var titleParts []string
+		var kind string
 		for idx := 0; idx < len(args); idx++ {
 			if args[idx] == "--tag" && idx+1 < len(args) {
 				tags = append(tags, strings.TrimSpace(args[idx+1]))
+				idx++
+			} else if args[idx] == "--kind" && idx+1 < len(args) {
+				kind = strings.TrimSpace(args[idx+1])
 				idx++
 			} else if !strings.HasPrefix(args[idx], "-") {
 				titleParts = append(titleParts, args[idx])
@@ -48,9 +52,13 @@ func ideaNewCommand(cfg *config.Config) *Command {
 			return fmt.Errorf("title required: anote new \"My idea title\"")
 		}
 
+		if kind != "" && !denote.IsValidKind(kind) {
+			return fmt.Errorf("invalid kind %q: use aspiration or belief", kind)
+		}
+
 		title := strings.Join(titleParts, " ")
 
-		created, err := idea.CreateIdea(cfg.IdeasDirectory, title, tags)
+		created, err := idea.CreateIdea(cfg.IdeasDirectory, title, tags, kind)
 		if err != nil {
 			return err
 		}
@@ -76,24 +84,26 @@ func isTerminalState(state string) bool {
 
 func ideaListCommand(cfg *config.Config) *Command {
 	var (
-		all      bool
-		state    string
-		maturity string
-		tag      string
+		all        bool
+		state      string
+		maturity   string
+		tag        string
+		kindFilter string
 	)
 
 	cmd := &Command{
 		Name:        "list",
-		Usage:       "anote list [--state STATE] [--maturity LEVEL] [--tag TAG] [-a]",
+		Usage:       "anote list [--state STATE] [--maturity LEVEL] [--kind KIND] [--tag TAG] [-a]",
 		Description: "List ideas",
 		Flags:       flag.NewFlagSet("list", flag.ContinueOnError),
 	}
 
 	cmd.Flags.BoolVar(&all, "a", false, "Show all ideas including terminal states")
 	cmd.Flags.BoolVar(&all, "all", false, "Show all ideas including terminal states")
-	cmd.Flags.StringVar(&state, "state", "", "Filter by state")
+	cmd.Flags.StringVar(&state, "state", "", "Filter by state (accepts display labels like considering)")
 	cmd.Flags.StringVar(&maturity, "maturity", "", "Filter by maturity")
 	cmd.Flags.StringVar(&tag, "tag", "", "Filter by tag")
+	cmd.Flags.StringVar(&kindFilter, "kind", "", "Filter by kind (aspiration or belief)")
 
 	cmd.Run = func(c *Command, args []string) error {
 		scanner := denote.NewScanner(cfg.IdeasDirectory)
@@ -107,15 +117,39 @@ func ideaListCommand(cfg *config.Config) *Command {
 			return ideas[i].ModTime.After(ideas[j].ModTime)
 		})
 
+		// Resolve display label to canonical state for filtering
+		filterState := state
+		filterStateKind := ""
+		if state != "" {
+			filterState, filterStateKind = denote.ResolveDisplayState(state)
+			if !denote.IsValidState(filterState) {
+				return fmt.Errorf("invalid state %q", state)
+			}
+		}
+
 		// Filter
 		var filtered []*denote.Idea
 		for _, i := range ideas {
+			effectiveKind := i.Kind
+			if effectiveKind == "" {
+				effectiveKind = denote.KindAspiration
+			}
+
 			// Default: exclude terminal states unless -a or specific --state
-			if !all && state == "" && isTerminalState(i.State) {
+			if !all && filterState == "" && isTerminalState(i.State) {
 				continue
 			}
 
-			if state != "" && i.State != state {
+			if filterState != "" && i.State != filterState {
+				continue
+			}
+
+			// If user typed a kind-specific label, also filter by the implied kind
+			if filterStateKind != "" && effectiveKind != filterStateKind {
+				continue
+			}
+
+			if kindFilter != "" && effectiveKind != kindFilter {
 				continue
 			}
 
@@ -148,9 +182,31 @@ func ideaListCommand(cfg *config.Config) *Command {
 			filtered = append(filtered, i)
 		}
 
-		// JSON output
+		// JSON output — use kind-specific display labels
 		if globalFlags.JSON {
-			data, err := json.MarshalIndent(filtered, "", "  ")
+			type jsonIdea struct {
+				DenoteID string    `json:"denote_id"`
+				Path     string    `json:"path"`
+				ModTime  time.Time `json:"modified_at"`
+				denote.IdeaMetadata
+			}
+			var output []jsonIdea
+			for _, i := range filtered {
+				ek := i.Kind
+				if ek == "" {
+					ek = denote.KindAspiration
+				}
+				ji := jsonIdea{
+					DenoteID:     i.File.ID,
+					Path:         i.File.Path,
+					ModTime:      i.ModTime,
+					IdeaMetadata: i.IdeaMetadata,
+				}
+				ji.State = denote.DisplayState(i.State, ek)
+				ji.Kind = ek
+				output = append(output, ji)
+			}
+			data, err := json.MarshalIndent(output, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal JSON: %w", err)
 			}
@@ -167,10 +223,21 @@ func ideaListCommand(cfg *config.Config) *Command {
 		}
 
 		// Header
-		fmt.Printf("%-5s %-12s %-8s %-40s %s\n", "#", "STATE", "MATURITY", "TITLE", "TAGS")
-		fmt.Printf("%-5s %-12s %-8s %-40s %s\n", "---", "-----", "--------", strings.Repeat("-", 40), "----")
+		fmt.Printf("%-5s %-4s %-14s %-8s %-38s %s\n", "#", "KIND", "STATE", "MATURITY", "TITLE", "TAGS")
+		fmt.Printf("%-5s %-4s %-14s %-8s %-38s %s\n", "---", "----", "-----", "--------", strings.Repeat("-", 38), "----")
 
 		for _, i := range filtered {
+			effectiveKind := i.Kind
+			if effectiveKind == "" {
+				effectiveKind = denote.KindAspiration
+			}
+			displayState := denote.DisplayState(i.State, effectiveKind)
+
+			kindShort := "A"
+			if effectiveKind == denote.KindBelief {
+				kindShort = "B"
+			}
+
 			mat := i.Maturity
 			if mat == "" {
 				mat = "-"
@@ -179,11 +246,11 @@ func ideaListCommand(cfg *config.Config) *Command {
 			tags := strings.Join(i.IdeaMetadata.Tags, ", ")
 
 			title := i.IdeaMetadata.Title
-			if len(title) > 40 {
-				title = title[:37] + "..."
+			if len(title) > 38 {
+				title = title[:35] + "..."
 			}
 
-			fmt.Printf("%-5d %-12s %-8s %-40s %s\n", i.IndexID, i.State, mat, title, tags)
+			fmt.Printf("%-5d %-4s %-14s %-8s %-38s %s\n", i.IndexID, kindShort, displayState, mat, title, tags)
 		}
 
 		return nil
@@ -225,9 +292,31 @@ func ideaShowCommand(cfg *config.Config) *Command {
 			return err
 		}
 
-		// JSON output
+		effectiveKind := i.Kind
+		if effectiveKind == "" {
+			effectiveKind = denote.KindAspiration
+		}
+		displayState := denote.DisplayState(i.State, effectiveKind)
+
+		// JSON output — use kind-specific display labels
 		if globalFlags.JSON {
-			data, err := json.MarshalIndent(i, "", "  ")
+			type jsonIdea struct {
+				DenoteID string    `json:"denote_id"`
+				Path     string    `json:"path"`
+				ModTime  time.Time `json:"modified_at"`
+				denote.IdeaMetadata
+				Content string `json:"content,omitempty"`
+			}
+			ji := jsonIdea{
+				DenoteID:     i.File.ID,
+				Path:         i.File.Path,
+				ModTime:      i.ModTime,
+				IdeaMetadata: i.IdeaMetadata,
+				Content:      extractIdeaContent(i.Content),
+			}
+			ji.State = displayState
+			ji.Kind = effectiveKind
+			data, err := json.MarshalIndent(ji, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal JSON: %w", err)
 			}
@@ -238,7 +327,8 @@ func ideaShowCommand(cfg *config.Config) *Command {
 		// Formatted output
 		fmt.Printf("Idea #%d: %s\n", i.IndexID, i.IdeaMetadata.Title)
 		fmt.Printf("Denote ID:  %s\n", i.File.ID)
-		fmt.Printf("State:      %s\n", i.State)
+		fmt.Printf("Kind:       %s\n", effectiveKind)
+		fmt.Printf("State:      %s\n", displayState)
 		if i.Maturity != "" {
 			fmt.Printf("Maturity:   %s\n", i.Maturity)
 		}
@@ -338,11 +428,13 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			return err
 		}
 
-		// Validate state transition
+		// Resolve display label to canonical state
 		if state != "" {
-			if state == denote.StateRejected {
+			resolved, _ := denote.ResolveDisplayState(state)
+			if resolved == denote.StateRejected {
 				return fmt.Errorf("use 'anote reject <id> \"reason\"' to reject an idea")
 			}
+			state = resolved
 			if err := denote.ValidateStateTransition(i.State, state); err != nil {
 				return err
 			}
@@ -364,17 +456,22 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 		}
 
 		if !globalFlags.Quiet {
+			effectiveKind := i.Kind
+			if effectiveKind == "" {
+				effectiveKind = denote.KindAspiration
+			}
+
 			fmt.Printf("Updated idea #%d: %q", i.IndexID, i.IdeaMetadata.Title)
 			if state != "" {
-				fmt.Printf(" [state: %s]", state)
+				fmt.Printf(" [state: %s]", denote.DisplayState(state, effectiveKind))
 			}
 			if maturity != "" {
 				fmt.Printf(" [maturity: %s]", maturity)
 			}
 			fmt.Println()
 
-			// Encourage project link when going active
-			if state == denote.StateActive && len(i.Project) == 0 {
+			// Encourage project link when aspiration goes active
+			if state == denote.StateActive && len(i.Project) == 0 && effectiveKind == denote.KindAspiration {
 				fmt.Println("Hint: Consider linking an atask project with 'anote project <id> <project-denote-id>'")
 			}
 		}

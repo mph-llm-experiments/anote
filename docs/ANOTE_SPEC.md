@@ -1,6 +1,6 @@
 # anote Specification
 
-**Version:** 0.1.0 (Draft)
+**Version:** 0.2.0
 **Date:** 2026-02-16
 
 ## Overview
@@ -10,7 +10,7 @@ anote is an agent-first idea management CLI that treats ideas as things that **m
 ## Principles
 
 1. **Same file conventions as atask** — Denote file naming, YAML frontmatter, Markdown content
-2. **Two orthogonal dimensions** — State (lifecycle position) and Maturity (how baked)
+2. **Three orthogonal dimensions** — State (lifecycle), Maturity (how baked), Kind (aspiration vs belief)
 3. **Ideas connect via relationships** — not blocking dependencies
 4. **Human writes prose, agent manages metadata** — human never touches YAML directly (TUI planned for metadata editing)
 5. **CLI-first** — designed as an agent skill first, human interaction tool second
@@ -45,6 +45,7 @@ YYYYMMDDTHHMMSS--title-slug__idea_tag1_tag2.md
 title: Coaching Practice - Non-Traditional Managers
 index_id: 5
 type: idea
+kind: aspiration
 state: active
 maturity: crawl
 tags: [coaching, retirement-planning, leadership]
@@ -62,6 +63,7 @@ modified: 2026-02-16T11:15:22Z
 
 ### Core Fields
 - `type` (string): Always `"idea"`
+- `kind` (string): `"aspiration"` (default) or `"belief"` — what type of idea this is (see Kind below)
 - `state` (string): Lifecycle state (see State below)
 - `maturity` (string): How baked the idea is (see Maturity below)
 - `tags` (array): Tags beyond those in the filename
@@ -120,6 +122,37 @@ Maturity tracks **how baked an idea is** — independent of lifecycle state.
 - An idea can move through `active → iterating → active` and advance maturity each cycle
 - Maturity is not strictly linear — an idea could be reassessed downward
 
+## Kind (Orthogonal to State and Maturity)
+
+Kind determines **what type of idea** this is. The same state machine applies to both kinds, but the display labels differ for three states.
+
+| Kind | Description |
+|------|-------------|
+| `aspiration` | Something to build, ship, or do (default) |
+| `belief` | Something held as true — a conviction, principle, or mental model |
+
+### Display Label Mapping
+
+The underlying state machine is identical. Kind determines the vocabulary:
+
+| Position | Aspiration | Belief |
+|----------|-----------|--------|
+| seed | seed | seed |
+| draft | draft | draft |
+| engaged | **active** | **considering** |
+| rethinking | **iterating** | **reconsidering** |
+| arrived (terminal) | **implemented** | **accepted** |
+| shelved (terminal) | archived | archived |
+| no (terminal) | rejected | rejected |
+| fizzled (terminal) | dropped | dropped |
+
+### Kind Rules
+- Default kind is `aspiration` (backward compatible — existing files without `kind` are aspirations)
+- CLI accepts display labels as input: `anote update 5 --state considering` works for beliefs
+- CLI displays kind-specific labels in output
+- JSON output uses kind-specific display labels for agent consumption
+- Canonical (aspiration) state values are stored in YAML frontmatter regardless of kind
+
 ## Sequential ID System
 
 ### Counter File: `.anote-counter.json`
@@ -159,13 +192,18 @@ This link is **strongly encouraged** when an idea reaches `active` state. The ag
 ## Core Commands (Planned)
 
 ```bash
-anote new "title"                        # Create new idea (state: seed)
+anote new "title"                        # Create new idea (state: seed, kind: aspiration)
+anote new --kind belief "title"          # Create a belief
+anote new --tag coaching "title"         # Create with tags
 anote list                               # List ideas
 anote list --state active                # Filter by state
+anote list --state considering           # Filter by belief display label
+anote list --kind belief                 # Filter by kind
 anote list --maturity crawl              # Filter by maturity
 anote list --tag coaching                # Filter by tag
 anote show <id>                          # Display full idea
 anote update <id> --state active         # Change state
+anote update <id> --state considering    # Use display labels for beliefs
 anote update <id> --maturity walk        # Change maturity
 anote tag <id> tag-name                  # Add tag
 anote link <id1> <id2>                   # Create relationship between ideas

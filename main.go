@@ -8,8 +8,8 @@ import (
 	"github.com/mph-llm-experiments/anote/internal/config"
 )
 
-var version = "0.1.0"
-var specVersion = "0.1.0"
+var version = "0.2.0"
+var specVersion = "0.2.0"
 
 func main() {
 	for _, arg := range os.Args[1:] {
