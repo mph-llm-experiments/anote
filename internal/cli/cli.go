@@ -49,8 +49,9 @@ Global Options:
   --quiet, -q    Minimal output`,
 	}
 
-	// Subcommands will be registered here as they are implemented.
-	// See issues #4-8 for planned commands.
+	root.Subcommands = append(root.Subcommands,
+		ideaNewCommand(cfg),
+	)
 
 	if len(remaining) == 0 {
 		root.PrintUsage()
