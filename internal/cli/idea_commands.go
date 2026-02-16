@@ -25,25 +25,32 @@ func (t *tagList) Set(value string) error {
 }
 
 func ideaNewCommand(cfg *config.Config) *Command {
-	var tags tagList
-
 	cmd := &Command{
 		Name:        "new",
 		Usage:       "anote new [--tag TAG]... <title>",
 		Description: "Create a new idea",
-		Flags:       flag.NewFlagSet("new", flag.ContinueOnError),
 	}
 
-	cmd.Flags.Var(&tags, "tag", "Add a tag (can be repeated)")
-
 	cmd.Run = func(c *Command, args []string) error {
-		if len(args) == 0 {
+		// Manual flag parsing to allow: new "title" --tag X or new --tag X "title"
+		var tags []string
+		var titleParts []string
+		for idx := 0; idx < len(args); idx++ {
+			if args[idx] == "--tag" && idx+1 < len(args) {
+				tags = append(tags, strings.TrimSpace(args[idx+1]))
+				idx++
+			} else if !strings.HasPrefix(args[idx], "-") {
+				titleParts = append(titleParts, args[idx])
+			}
+		}
+
+		if len(titleParts) == 0 {
 			return fmt.Errorf("title required: anote new \"My idea title\"")
 		}
 
-		title := strings.Join(args, " ")
+		title := strings.Join(titleParts, " ")
 
-		created, err := idea.CreateIdea(cfg.IdeasDirectory, title, []string(tags))
+		created, err := idea.CreateIdea(cfg.IdeasDirectory, title, tags)
 		if err != nil {
 			return err
 		}
