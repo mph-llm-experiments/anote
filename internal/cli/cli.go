@@ -51,6 +51,7 @@ Global Options:
 
 	root.Subcommands = append(root.Subcommands,
 		ideaNewCommand(cfg),
+		ideaListCommand(cfg),
 	)
 
 	if len(remaining) == 0 {
