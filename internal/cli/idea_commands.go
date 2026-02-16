@@ -440,8 +440,8 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 				return fmt.Errorf("use 'anote reject <id> \"reason\"' to reject an idea")
 			}
 			state = resolved
-			if err := denote.ValidateStateTransition(i.State, state); err != nil {
-				return err
+			if !denote.IsValidState(state) {
+				return fmt.Errorf("invalid state %q", state)
 			}
 			i.IdeaMetadata.State = state
 		}
@@ -518,10 +518,6 @@ func ideaRejectCommand(cfg *config.Config) *Command {
 		reason := strings.Join(args[1:], " ")
 		if strings.TrimSpace(reason) == "" {
 			return fmt.Errorf("rejection reason cannot be empty")
-		}
-
-		if err := denote.ValidateStateTransition(i.State, denote.StateRejected); err != nil {
-			return err
 		}
 
 		i.IdeaMetadata.State = denote.StateRejected

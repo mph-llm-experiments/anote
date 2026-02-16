@@ -64,7 +64,7 @@ The CLI accepts display labels as input (e.g., `--state considering` works) and 
 ### Rules to Enforce
 1. **Rejected requires a reason.** Always ask the human why before rejecting.
 2. **Active encourages a project link.** When an aspiration-kind idea goes active, suggest linking to an atask project.
-3. **State transitions are validated.** You cannot skip states (e.g., seed → active is invalid, must go seed → draft → active).
+3. **No enforced state transitions.** Any state can move to any other state. The typical flow is seed → draft → active → implemented, but the user is free to skip or jump as they see fit.
 4. **Accepted ideas inform context.** When the user discusses a topic, pull ideas with `kind: belief` and state `accepted` as context that shapes advice.
 
 ## Command Reference
@@ -270,5 +270,6 @@ iterating → active | implemented | archived | rejected | dropped
 archived → active
 ```
 
-Terminal states (implemented, rejected, dropped) have no outbound transitions.
+Any state can transition to any other state — there are no enforced flow rules.
+The typical progression is shown above, but skipping states is allowed.
 Display labels (considering, reconsidering, accepted) map to canonical states (active, iterating, implemented) and are used when an idea has `kind: belief`.
