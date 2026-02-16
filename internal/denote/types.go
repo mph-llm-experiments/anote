@@ -1,6 +1,7 @@
 package denote
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -133,4 +134,55 @@ func IsValidMaturity(maturity string) bool {
 		return true
 	}
 	return false
+}
+
+// allowedTransitions defines which state transitions are valid per the spec.
+var allowedTransitions = map[string][]string{
+	StateSeed:      {StateDraft},
+	StateDraft:     {StateActive},
+	StateActive:    {StateIterating, StateImplemented, StateArchived, StateRejected, StateDropped},
+	StateIterating: {StateActive, StateImplemented, StateArchived, StateRejected, StateDropped},
+	StateArchived:  {StateActive},
+	// Terminal states with no outbound transitions:
+	// StateImplemented, StateRejected, StateDropped
+}
+
+// ValidateStateTransition checks if a state transition is allowed.
+func ValidateStateTransition(from, to string) error {
+	if !IsValidState(from) {
+		return fmt.Errorf("invalid source state: %s", from)
+	}
+	if !IsValidState(to) {
+		return fmt.Errorf("invalid target state: %s", to)
+	}
+
+	allowed, ok := allowedTransitions[from]
+	if !ok {
+		return fmt.Errorf("no transitions allowed from terminal state %q", from)
+	}
+
+	for _, s := range allowed {
+		if s == to {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("transition from %q to %q is not allowed", from, to)
+}
+
+// ValidateIdea checks business rules for an idea.
+func ValidateIdea(idea *Idea) error {
+	if idea.State != "" && !IsValidState(idea.State) {
+		return fmt.Errorf("invalid state: %s", idea.State)
+	}
+
+	if idea.Maturity != "" && !IsValidMaturity(idea.Maturity) {
+		return fmt.Errorf("invalid maturity: %s", idea.Maturity)
+	}
+
+	if idea.State == StateRejected && strings.TrimSpace(idea.RejectedReason) == "" {
+		return fmt.Errorf("rejected state requires a rejected_reason")
+	}
+
+	return nil
 }
