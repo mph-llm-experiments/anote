@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mph-llm-experiments/anote/internal/config"
@@ -180,4 +182,128 @@ func ideaListCommand(cfg *config.Config) *Command {
 	}
 
 	return cmd
+}
+
+var denoteIDPattern = regexp.MustCompile(`^\d{8}T\d{6}$`)
+
+// lookupIdea finds an idea by index_id (number) or Denote ID (timestamp).
+func lookupIdea(dir string, ref string) (*denote.Idea, error) {
+	if denoteIDPattern.MatchString(ref) {
+		return idea.FindIdeaByDenoteID(dir, ref)
+	}
+
+	id, err := strconv.Atoi(ref)
+	if err != nil {
+		return nil, fmt.Errorf("invalid idea reference %q: use a number or Denote ID", ref)
+	}
+
+	return idea.FindIdeaByID(dir, id)
+}
+
+func ideaShowCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "show",
+		Usage:       "anote show <id>",
+		Description: "Show idea details",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		if len(args) == 0 {
+			return fmt.Errorf("idea ID required: anote show <id>")
+		}
+
+		i, err := lookupIdea(cfg.IdeasDirectory, args[0])
+		if err != nil {
+			return err
+		}
+
+		// JSON output
+		if globalFlags.JSON {
+			data, err := json.MarshalIndent(i, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+
+		// Formatted output
+		fmt.Printf("Idea #%d: %s\n", i.IndexID, i.IdeaMetadata.Title)
+		fmt.Printf("Denote ID:  %s\n", i.File.ID)
+		fmt.Printf("State:      %s\n", i.State)
+		if i.Maturity != "" {
+			fmt.Printf("Maturity:   %s\n", i.Maturity)
+		}
+		if len(i.IdeaMetadata.Tags) > 0 {
+			fmt.Printf("Tags:       %s\n", strings.Join(i.IdeaMetadata.Tags, ", "))
+		}
+		if i.Created != "" {
+			fmt.Printf("Created:    %s\n", i.Created)
+		}
+		if i.Modified != "" {
+			fmt.Printf("Modified:   %s\n", i.Modified)
+		}
+		if i.RejectedReason != "" {
+			fmt.Printf("Rejected:   %s\n", i.RejectedReason)
+		}
+
+		// Related ideas — resolve titles
+		if len(i.Related) > 0 {
+			fmt.Printf("Related:\n")
+			scanner := denote.NewScanner(cfg.IdeasDirectory)
+			allIdeas, _ := scanner.FindIdeas()
+			idMap := make(map[string]string)
+			for _, a := range allIdeas {
+				idMap[a.File.ID] = a.IdeaMetadata.Title
+			}
+			for _, relID := range i.Related {
+				title, ok := idMap[relID]
+				if ok {
+					fmt.Printf("  - %s (%s)\n", title, relID)
+				} else {
+					fmt.Printf("  - %s\n", relID)
+				}
+			}
+		}
+
+		// Linked projects
+		if len(i.Project) > 0 {
+			fmt.Printf("Projects:\n")
+			for _, projID := range i.Project {
+				fmt.Printf("  - %s\n", projID)
+			}
+		}
+
+		fmt.Printf("File:       %s\n", i.File.Path)
+
+		// Show content (everything after frontmatter)
+		content := extractIdeaContent(i.Content)
+		if content != "" {
+			fmt.Printf("\n%s", content)
+		}
+
+		return nil
+	}
+
+	return cmd
+}
+
+// extractIdeaContent extracts the body content after YAML frontmatter.
+func extractIdeaContent(fullContent string) string {
+	if !strings.HasPrefix(fullContent, "---\n") {
+		return fullContent
+	}
+
+	lines := strings.Split(fullContent, "\n")
+	for idx, line := range lines {
+		if idx == 0 {
+			continue
+		}
+		if line == "---" {
+			rest := strings.Join(lines[idx+1:], "\n")
+			return strings.TrimPrefix(rest, "\n")
+		}
+	}
+
+	return ""
 }
