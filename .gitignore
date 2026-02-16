@@ -1,0 +1,11 @@
+/anote
+*.exe
+*.test
+*.out
+.DS_Store
+coverage.txt
+/dist/
+
+# Test data
+test-ideas/
+test-config.toml
