@@ -55,6 +55,9 @@ Global Options:
 		ideaShowCommand(cfg),
 		ideaUpdateCommand(cfg),
 		ideaRejectCommand(cfg),
+		ideaTagCommand(cfg),
+		ideaLinkCommand(cfg),
+		ideaProjectCommand(cfg),
 	)
 
 	if len(remaining) == 0 {

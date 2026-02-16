@@ -2,6 +2,8 @@ package denote
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -37,4 +39,28 @@ func BuildDenoteFilename(id, slug string, tags []string) string {
 		tagString = "__" + strings.Join(tags, "_")
 	}
 	return fmt.Sprintf("%s--%s%s.md", id, slug, tagString)
+}
+
+// RenameFileForTags renames a Denote file to reflect updated tags.
+// Returns the new file path.
+func RenameFileForTags(oldPath string, newTags []string) (string, error) {
+	p := NewParser()
+	file, err := p.ParseFilename(oldPath)
+	if err != nil {
+		return "", err
+	}
+
+	newFilename := BuildDenoteFilename(file.ID, file.Slug, newTags)
+	dir := filepath.Dir(oldPath)
+	newPath := filepath.Join(dir, newFilename)
+
+	if oldPath == newPath {
+		return oldPath, nil
+	}
+
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return "", fmt.Errorf("failed to rename file: %w", err)
+	}
+
+	return newPath, nil
 }

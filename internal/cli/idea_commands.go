@@ -422,6 +422,215 @@ func ideaRejectCommand(cfg *config.Config) *Command {
 	return cmd
 }
 
+func ideaTagCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "tag",
+		Usage:       "anote tag <id> <tag> [--remove]",
+		Description: "Add or remove a tag",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		// Parse: tag <id> <tagname> [--remove] or tag <id> --remove <tagname>
+		var idRef, tagName string
+		remove := false
+		for _, arg := range args {
+			if arg == "--remove" {
+				remove = true
+			} else if !strings.HasPrefix(arg, "-") {
+				if idRef == "" {
+					idRef = arg
+				} else if tagName == "" {
+					tagName = arg
+				}
+			}
+		}
+
+		if idRef == "" || tagName == "" {
+			return fmt.Errorf("usage: anote tag <id> <tag> [--remove]")
+		}
+
+		i, err := lookupIdea(cfg.IdeasDirectory, idRef)
+		if err != nil {
+			return err
+		}
+
+		if remove {
+			// Remove from frontmatter tags
+			var newTags []string
+			for _, t := range i.IdeaMetadata.Tags {
+				if t != tagName {
+					newTags = append(newTags, t)
+				}
+			}
+			i.IdeaMetadata.Tags = newTags
+
+			// Remove from filename tags and rename
+			var newFileTags []string
+			for _, t := range i.File.Tags {
+				if t != tagName {
+					newFileTags = append(newFileTags, t)
+				}
+			}
+			newPath, err := denote.RenameFileForTags(i.File.Path, newFileTags)
+			if err != nil {
+				return fmt.Errorf("failed to rename file: %w", err)
+			}
+			i.File.Path = newPath
+
+			if !globalFlags.Quiet {
+				fmt.Printf("Removed tag %q from idea #%d\n", tagName, i.IndexID)
+			}
+		} else {
+			// Add to frontmatter tags (skip duplicates)
+			found := false
+			for _, t := range i.IdeaMetadata.Tags {
+				if t == tagName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				i.IdeaMetadata.Tags = append(i.IdeaMetadata.Tags, tagName)
+			}
+
+			// Add to filename tags (skip duplicates)
+			fileHasTag := false
+			for _, t := range i.File.Tags {
+				if t == tagName {
+					fileHasTag = true
+					break
+				}
+			}
+			if !fileHasTag {
+				newFileTags := append(i.File.Tags, tagName)
+				newPath, err := denote.RenameFileForTags(i.File.Path, newFileTags)
+				if err != nil {
+					return fmt.Errorf("failed to rename file: %w", err)
+				}
+				i.File.Path = newPath
+			}
+
+			if !globalFlags.Quiet {
+				fmt.Printf("Added tag %q to idea #%d\n", tagName, i.IndexID)
+			}
+		}
+
+		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
+		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+			return fmt.Errorf("failed to update frontmatter: %w", err)
+		}
+
+		return nil
+	}
+
+	return cmd
+}
+
+func ideaLinkCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "link",
+		Usage:       "anote link <id1> <id2>",
+		Description: "Link two related ideas (bidirectional)",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		if len(args) < 2 {
+			return fmt.Errorf("usage: anote link <id1> <id2>")
+		}
+
+		idea1, err := lookupIdea(cfg.IdeasDirectory, args[0])
+		if err != nil {
+			return fmt.Errorf("first idea: %w", err)
+		}
+
+		idea2, err := lookupIdea(cfg.IdeasDirectory, args[1])
+		if err != nil {
+			return fmt.Errorf("second idea: %w", err)
+		}
+
+		now := time.Now().Format(time.RFC3339)
+
+		// Add idea2's ID to idea1's related (skip duplicates)
+		if !containsStr(idea1.Related, idea2.File.ID) {
+			idea1.IdeaMetadata.Related = append(idea1.IdeaMetadata.Related, idea2.File.ID)
+			idea1.IdeaMetadata.Modified = now
+			if err := denote.UpdateFrontmatter(idea1.File.Path, &idea1.IdeaMetadata); err != nil {
+				return fmt.Errorf("failed to update idea #%d: %w", idea1.IndexID, err)
+			}
+		}
+
+		// Add idea1's ID to idea2's related (skip duplicates)
+		if !containsStr(idea2.Related, idea1.File.ID) {
+			idea2.IdeaMetadata.Related = append(idea2.IdeaMetadata.Related, idea1.File.ID)
+			idea2.IdeaMetadata.Modified = now
+			if err := denote.UpdateFrontmatter(idea2.File.Path, &idea2.IdeaMetadata); err != nil {
+				return fmt.Errorf("failed to update idea #%d: %w", idea2.IndexID, err)
+			}
+		}
+
+		if !globalFlags.Quiet {
+			fmt.Printf("Linked idea #%d ↔ idea #%d\n", idea1.IndexID, idea2.IndexID)
+		}
+
+		return nil
+	}
+
+	return cmd
+}
+
+func ideaProjectCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "project",
+		Usage:       "anote project <id> <project-denote-id>",
+		Description: "Link idea to an atask project",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		if len(args) < 2 {
+			return fmt.Errorf("usage: anote project <id> <project-denote-id>")
+		}
+
+		i, err := lookupIdea(cfg.IdeasDirectory, args[0])
+		if err != nil {
+			return err
+		}
+
+		projectID := args[1]
+
+		// Skip duplicates
+		if containsStr(i.Project, projectID) {
+			if !globalFlags.Quiet {
+				fmt.Printf("Idea #%d is already linked to project %s\n", i.IndexID, projectID)
+			}
+			return nil
+		}
+
+		i.IdeaMetadata.Project = append(i.IdeaMetadata.Project, projectID)
+		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
+
+		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+			return fmt.Errorf("failed to update idea: %w", err)
+		}
+
+		if !globalFlags.Quiet {
+			fmt.Printf("Linked idea #%d to project %s\n", i.IndexID, projectID)
+		}
+
+		return nil
+	}
+
+	return cmd
+}
+
+func containsStr(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 // extractIdeaContent extracts the body content after YAML frontmatter.
 func extractIdeaContent(fullContent string) string {
 	if !strings.HasPrefix(fullContent, "---\n") {
