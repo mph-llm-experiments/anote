@@ -98,13 +98,14 @@ anote show 20260216T103045          # By Denote ID
 anote --json show 5                 # JSON output
 ```
 
-### Update State or Maturity
+### Update State, Maturity, or Kind
 ```bash
 anote update 5 --state draft        # Progress state
 anote update 5 --state considering  # Use display labels (belief kind)
 anote update 5 --state accepted     # Terminal state for belief kind
 anote update 5 --maturity walk      # Advance maturity
-anote update 5 --state active --maturity crawl  # Both at once
+anote update 5 --kind belief        # Reclassify an idea's kind
+anote update 5 --state active --maturity crawl  # Multiple at once
 ```
 
 ### Reject an Idea (Reason Required)

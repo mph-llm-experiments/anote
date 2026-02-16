@@ -389,13 +389,13 @@ func ideaShowCommand(cfg *config.Config) *Command {
 func ideaUpdateCommand(cfg *config.Config) *Command {
 	cmd := &Command{
 		Name:        "update",
-		Usage:       "anote update <id> [--state STATE] [--maturity LEVEL]",
-		Description: "Update idea state or maturity",
+		Usage:       "anote update <id> [--state STATE] [--maturity LEVEL] [--kind KIND]",
+		Description: "Update idea state, maturity, or kind",
 	}
 
 	cmd.Run = func(c *Command, args []string) error {
 		// Manual flag parsing to allow: update <id> --state X or update --state X <id>
-		var state, maturity, idRef string
+		var state, maturity, kind, idRef string
 		for idx := 0; idx < len(args); idx++ {
 			switch args[idx] {
 			case "--state":
@@ -406,6 +406,11 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			case "--maturity":
 				if idx+1 < len(args) {
 					maturity = args[idx+1]
+					idx++
+				}
+			case "--kind":
+				if idx+1 < len(args) {
+					kind = args[idx+1]
 					idx++
 				}
 			default:
@@ -419,8 +424,8 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			return fmt.Errorf("idea ID required: anote update <id> --state STATE")
 		}
 
-		if state == "" && maturity == "" {
-			return fmt.Errorf("nothing to update: provide --state and/or --maturity")
+		if state == "" && maturity == "" && kind == "" {
+			return fmt.Errorf("nothing to update: provide --state, --maturity, and/or --kind")
 		}
 
 		i, err := lookupIdea(cfg.IdeasDirectory, idRef)
@@ -439,6 +444,14 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 				return err
 			}
 			i.IdeaMetadata.State = state
+		}
+
+		// Validate and set kind
+		if kind != "" {
+			if !denote.IsValidKind(kind) {
+				return fmt.Errorf("invalid kind %q: use aspiration or belief", kind)
+			}
+			i.IdeaMetadata.Kind = kind
 		}
 
 		// Validate and set maturity
@@ -462,6 +475,9 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			}
 
 			fmt.Printf("Updated idea #%d: %q", i.IndexID, i.IdeaMetadata.Title)
+			if kind != "" {
+				fmt.Printf(" [kind: %s]", kind)
+			}
 			if state != "" {
 				fmt.Printf(" [state: %s]", denote.DisplayState(state, effectiveKind))
 			}
