@@ -7,79 +7,88 @@ description: Agent-first idea management using the anote CLI. Use when capturing
 
 Manage ideas using the anote CLI tool. Ideas are things that **mature** rather than things that get **done**. This is a sibling tool to denote-tasks (atask) — use anote for thinking, atask for doing.
 
+**IMPORTANT: Everything is an idea.** Aspirations and beliefs are both ideas — they are managed with the same `anote` commands and stored in the same ideas directory. The `kind` field is simply a property on an idea, like `state` or `maturity`. Never create separate files or use different tools for different kinds of ideas. Always use `anote`.
+
 ## When to Use anote vs atask
 
 | Use anote when... | Use atask when... |
 |---|---|
-| Capturing a thought or aspiration | Creating actionable work |
-| Recording a belief or conviction | Assigning tasks with deadlines |
+| Capturing any kind of idea | Creating actionable work |
+| Recording something the user believes to be true | Assigning tasks with deadlines |
 | Exploring "what if" scenarios | Tracking task completion |
 | Tracking idea maturity (crawl/walk/run) | Managing project deliverables |
 | Connecting related concepts | Managing project deliverables |
 
 ## Core Concepts
 
+### Everything is an Idea
+
+All items managed by anote are **ideas**. Every idea has a `kind` property:
+
+- `aspiration` (default): An idea about something to build, ship, or do
+- `belief`: An idea that represents a conviction, principle, or mental model the user holds
+
+Both kinds are created with `anote new`, listed with `anote list`, updated with `anote update`, etc. The `kind` only affects which **display labels** the CLI uses for certain states.
+
 ### Three Orthogonal Dimensions
 
-**Kind** — what type of idea:
-- `aspiration` (default): Something to build/do. States display as: active, iterating, implemented
-- `belief`: Something held as true. States display as: considering, reconsidering, accepted
+Every idea has three properties:
 
-**State** — where in the journey:
+**Kind** — what sort of idea (`aspiration` or `belief`)
+
+**State** — where in its journey:
 - `seed` → `draft` → `active` ↔ `iterating` → terminal state
 - Terminal states: `implemented`, `archived`, `rejected`, `dropped`
-- For beliefs, display labels differ (see table below)
 
 **Maturity** — how baked (orthogonal to state and kind):
 - `crawl` → `walk` → `run`
-- Only meaningful once an idea is `active`/`considering`
+- Only meaningful once an idea reaches the "engaged" state
 
-### Display Label Mapping
+### Display Labels by Kind
 
-The state machine is identical for both kinds. Only the display labels change:
+The state machine is identical for all ideas. The `kind` property only changes the **display labels** for three states:
 
-| Position | Aspiration | Belief |
+| Position | kind: aspiration | kind: belief |
 |----------|-----------|--------|
 | seed | seed | seed |
 | draft | draft | draft |
 | engaged | **active** | **considering** |
 | rethinking | **iterating** | **reconsidering** |
-| arrived | **implemented** | **accepted** |
-| shelved | archived | archived |
-| no | rejected | rejected |
-| fizzled | dropped | dropped |
+| arrived (terminal) | **implemented** | **accepted** |
+| shelved (terminal) | archived | archived |
+| no (terminal) | rejected | rejected |
+| fizzled (terminal) | dropped | dropped |
 
-CLI accepts display labels as input (e.g., `--state considering` works for beliefs).
+The CLI accepts display labels as input (e.g., `--state considering` works) and shows them in output.
 
 ### Rules to Enforce
 1. **Rejected requires a reason.** Always ask the human why before rejecting.
-2. **Active encourages a project link.** When an aspiration goes active, suggest linking to an atask project.
+2. **Active encourages a project link.** When an aspiration-kind idea goes active, suggest linking to an atask project.
 3. **State transitions are validated.** You cannot skip states (e.g., seed → active is invalid, must go seed → draft → active).
-4. **Beliefs inform context.** When the user discusses a topic, pull accepted beliefs as context that shapes advice.
+4. **Accepted ideas inform context.** When the user discusses a topic, pull ideas with `kind: belief` and state `accepted` as context that shapes advice.
 
 ## Command Reference
 
 ### Create an Idea
 ```bash
-anote new "My idea title"
-anote new --kind belief "Chaos-to-system translation is unsustainable"
-anote new --tag coaching --tag leadership "Coaching practice"
-anote new --kind belief --tag work "Remote work requires trust"
+anote new "My idea title"                                    # kind defaults to aspiration
+anote new --kind belief "Chaos-to-system is unsustainable"   # explicitly set kind
+anote new --tag coaching --tag leadership "Coaching practice" # with tags
+anote new --kind belief --tag work "Remote work needs trust"  # kind + tags
 ```
 State defaults to `seed`. Kind defaults to `aspiration`. The `idea` tag is always added to the filename.
 
 ### List Ideas
 ```bash
-anote list                          # Non-terminal ideas
+anote list                          # Non-terminal ideas (all kinds)
 anote list --state active           # Filter by state
-anote list --state considering      # Beliefs in the "active" position
+anote list --state considering      # Ideas with kind=belief in the "active" position
 anote list --kind belief            # Filter by kind
-anote list --kind aspiration        # Only aspirations
+anote list --kind aspiration        # Only aspiration-kind ideas
 anote list --maturity crawl         # Filter by maturity
 anote list --tag coaching           # Filter by tag
 anote list -a                       # All ideas including terminal
 anote --json list                   # JSON for agent processing
-anote --json list --kind belief     # JSON beliefs for agent context
 ```
 
 ### Show Idea Details
@@ -92,8 +101,8 @@ anote --json show 5                 # JSON output
 ### Update State or Maturity
 ```bash
 anote update 5 --state draft        # Progress state
-anote update 5 --state considering  # Use belief display labels
-anote update 5 --state accepted     # Belief reaches terminal
+anote update 5 --state considering  # Use display labels (belief kind)
+anote update 5 --state accepted     # Terminal state for belief kind
 anote update 5 --maturity walk      # Advance maturity
 anote update 5 --state active --maturity crawl  # Both at once
 ```
@@ -115,7 +124,7 @@ Tags update both the filename and frontmatter.
 ```bash
 anote link 5 8                      # Bidirectional link
 ```
-Both ideas get each other's Denote ID in their `related` array.
+Both ideas get each other's Denote ID in their `related` array. Ideas of any kind can be linked to each other.
 
 ### Link to atask Project
 ```bash
@@ -127,11 +136,9 @@ anote project 5 20260215T140000     # Link to project by Denote ID
 ### Idea Capture Session
 When the user wants to brainstorm or capture ideas:
 ```bash
-# Capture aspirations
-anote new --tag brainstorm "Idea title"
-
-# Capture beliefs
-anote new --kind belief --tag brainstorm "Belief statement"
+# Capture ideas — use --kind belief when it's a conviction, otherwise default is fine
+anote new --tag brainstorm "Build a mentoring platform"
+anote new --kind belief --tag brainstorm "Chaos-to-system translation is unsustainable"
 
 # Review what was captured
 anote list --tag brainstorm
@@ -140,100 +147,85 @@ anote list --tag brainstorm
 ### Idea Review / Pipeline Check
 When the user wants to review their ideas:
 ```bash
-# What aspirations are active?
-anote --json list --state active --kind aspiration
+# What ideas are actively being worked on or considered?
+anote --json list --state active
+anote --json list --state considering
 
-# What beliefs are accepted? (use as context)
-anote --json list --state accepted
-
-# What beliefs are being reconsidered?
-anote --json list --state reconsidering
-
-# What seeds need attention?
+# What ideas need attention?
 anote --json list --state seed
 
-# What's iterating?
+# What's being reworked?
 anote --json list --state iterating
+anote --json list --state reconsidering
 ```
 
 ### Contextual Conversations
 When the user says "let's talk about [topic]":
-1. Pull accepted beliefs tagged with relevant topics — these inform your advice
-2. Pull considering beliefs — probe these: "You've been thinking about X — how does this land now?"
-3. Pull active aspirations — these are in-flight work
+1. Pull accepted belief-kind ideas tagged with relevant topics — these inform your advice
+2. Pull considering belief-kind ideas — probe these: "You've been thinking about X — how does this land now?"
+3. Pull active aspiration-kind ideas — these are in-flight work
 
 ```bash
-# Pull beliefs about work
+# Pull belief-kind ideas about work for context
 anote --json list --kind belief --tag work
 
-# Pull all active things
+# Pull all engaged ideas
 anote --json list --state active
 anote --json list --state considering
 ```
 
-### Maturing an Aspiration
-When an aspiration progresses:
-1. `seed → draft`: User has written prose fleshing it out
-2. `draft → active`: Work is beginning — suggest linking an atask project
-3. `active → iterating`: Coming back to rework — may advance maturity
-4. `iterating → active`: After rework, consider advancing maturity (crawl → walk → run)
+### Progressing an Idea
+The journey is the same regardless of kind — only the labels differ:
+
+1. `seed → draft`: User has written prose fleshing it out / articulating it clearly
+2. `draft → active/considering`: Work is beginning (aspiration) or user is evaluating it (belief)
+3. `active/considering → iterating/reconsidering`: Coming back to rework or re-evaluate
+4. `iterating/reconsidering → active/considering`: After rework, consider advancing maturity
 
 ```bash
 anote update 5 --state draft
 # ... user adds content ...
-anote update 5 --state active
-# "Consider linking an atask project: anote project 5 <project-id>"
-anote update 5 --maturity crawl
+anote update 5 --state active          # aspiration: work begins
+anote update 5 --state considering     # belief: user is evaluating
 ```
 
-### Maturing a Belief
-When a belief progresses:
-1. `seed → draft`: User has articulated the belief clearly
-2. `draft → considering`: User is actively evaluating whether they accept it
-3. `considering → reconsidering`: Something challenged the belief
-4. `reconsidering → considering`: Re-evaluated, still holding
-5. `considering → accepted`: User commits to this as true
-
+For aspiration-kind ideas going active, suggest linking an atask project:
 ```bash
-anote update 5 --state draft
-# ... user refines the belief ...
-anote update 5 --state considering
-# Agent can probe: "You've been considering X — does it still ring true?"
-anote update 5 --state accepted
+# "Consider linking an atask project: anote project 5 <project-id>"
 ```
 
-When a user says "I'm not sure about that anymore":
+For belief-kind ideas in `considering`, probe the user:
+```bash
+# "You've been considering X — does it still ring true?"
+```
+
+When a user says "I'm not sure about that anymore" about a belief:
 ```bash
 anote update 5 --state reconsidering
-# Probe: "What's changed? What challenged this belief?"
-```
-
-When a user says "I don't believe that anymore":
-```bash
-anote reject 5 "Reason for no longer believing"
+# Probe: "What's changed? What challenged this?"
 ```
 
 ### Closing Ideas
 ```bash
-# Aspiration shipped
+# Aspiration-kind: it shipped
 anote update 5 --state implemented
 
-# Belief accepted
+# Belief-kind: user commits to it as true
 anote update 5 --state accepted
 
-# Shelving for later
+# Shelving for later (any kind)
 anote update 5 --state archived
 
-# Deliberate no (reason required)
+# Deliberate no (reason required, any kind)
 anote reject 5 "Decided this doesn't align with current goals"
 
-# Fizzled out
+# Fizzled out (any kind)
 anote update 5 --state dropped
 ```
 
 ## File Format
 
-Ideas are Markdown files with Denote naming:
+All ideas are Markdown files with Denote naming:
 ```
 YYYYMMDDTHHMMSS--title-slug__idea_tag1_tag2.md
 ```
@@ -278,4 +270,4 @@ archived → active
 ```
 
 Terminal states (implemented, rejected, dropped) have no outbound transitions.
-Display labels (considering, reconsidering, accepted) map to canonical states (active, iterating, implemented).
+Display labels (considering, reconsidering, accepted) map to canonical states (active, iterating, implemented) and are used when an idea has `kind: belief`.
