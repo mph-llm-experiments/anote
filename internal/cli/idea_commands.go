@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mph-llm-experiments/anote/internal/config"
 	"github.com/mph-llm-experiments/anote/internal/denote"
@@ -280,6 +281,139 @@ func ideaShowCommand(cfg *config.Config) *Command {
 		content := extractIdeaContent(i.Content)
 		if content != "" {
 			fmt.Printf("\n%s", content)
+		}
+
+		return nil
+	}
+
+	return cmd
+}
+
+func ideaUpdateCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "update",
+		Usage:       "anote update <id> [--state STATE] [--maturity LEVEL]",
+		Description: "Update idea state or maturity",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		// Manual flag parsing to allow: update <id> --state X or update --state X <id>
+		var state, maturity, idRef string
+		for idx := 0; idx < len(args); idx++ {
+			switch args[idx] {
+			case "--state":
+				if idx+1 < len(args) {
+					state = args[idx+1]
+					idx++
+				}
+			case "--maturity":
+				if idx+1 < len(args) {
+					maturity = args[idx+1]
+					idx++
+				}
+			default:
+				if !strings.HasPrefix(args[idx], "-") && idRef == "" {
+					idRef = args[idx]
+				}
+			}
+		}
+
+		if idRef == "" {
+			return fmt.Errorf("idea ID required: anote update <id> --state STATE")
+		}
+
+		if state == "" && maturity == "" {
+			return fmt.Errorf("nothing to update: provide --state and/or --maturity")
+		}
+
+		i, err := lookupIdea(cfg.IdeasDirectory, idRef)
+		if err != nil {
+			return err
+		}
+
+		// Validate state transition
+		if state != "" {
+			if state == denote.StateRejected {
+				return fmt.Errorf("use 'anote reject <id> \"reason\"' to reject an idea")
+			}
+			if err := denote.ValidateStateTransition(i.State, state); err != nil {
+				return err
+			}
+			i.IdeaMetadata.State = state
+		}
+
+		// Validate and set maturity
+		if maturity != "" {
+			if !denote.IsValidMaturity(maturity) {
+				return fmt.Errorf("invalid maturity %q: use crawl, walk, or run", maturity)
+			}
+			i.IdeaMetadata.Maturity = maturity
+		}
+
+		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
+
+		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+			return fmt.Errorf("failed to update idea: %w", err)
+		}
+
+		if !globalFlags.Quiet {
+			fmt.Printf("Updated idea #%d: %q", i.IndexID, i.IdeaMetadata.Title)
+			if state != "" {
+				fmt.Printf(" [state: %s]", state)
+			}
+			if maturity != "" {
+				fmt.Printf(" [maturity: %s]", maturity)
+			}
+			fmt.Println()
+
+			// Encourage project link when going active
+			if state == denote.StateActive && len(i.Project) == 0 {
+				fmt.Println("Hint: Consider linking an atask project with 'anote project <id> <project-denote-id>'")
+			}
+		}
+
+		return nil
+	}
+
+	return cmd
+}
+
+func ideaRejectCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "reject",
+		Usage:       "anote reject <id> <reason>",
+		Description: "Reject an idea (reason required)",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		if len(args) < 2 {
+			return fmt.Errorf("usage: anote reject <id> \"reason for rejection\"")
+		}
+
+		i, err := lookupIdea(cfg.IdeasDirectory, args[0])
+		if err != nil {
+			return err
+		}
+
+		reason := strings.Join(args[1:], " ")
+		if strings.TrimSpace(reason) == "" {
+			return fmt.Errorf("rejection reason cannot be empty")
+		}
+
+		if err := denote.ValidateStateTransition(i.State, denote.StateRejected); err != nil {
+			return err
+		}
+
+		i.IdeaMetadata.State = denote.StateRejected
+		i.IdeaMetadata.RejectedReason = reason
+		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
+
+		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+			return fmt.Errorf("failed to reject idea: %w", err)
+		}
+
+		if !globalFlags.Quiet {
+			fmt.Printf("Rejected idea #%d: %q — %s\n", i.IndexID, i.IdeaMetadata.Title, reason)
 		}
 
 		return nil

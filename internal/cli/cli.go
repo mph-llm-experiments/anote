@@ -53,6 +53,8 @@ Global Options:
 		ideaNewCommand(cfg),
 		ideaListCommand(cfg),
 		ideaShowCommand(cfg),
+		ideaUpdateCommand(cfg),
+		ideaRejectCommand(cfg),
 	)
 
 	if len(remaining) == 0 {
