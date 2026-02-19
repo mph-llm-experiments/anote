@@ -1,11 +1,11 @@
 ---
 name: anote
-description: Agent-first idea management using the anote CLI. Use when capturing ideas, tracking idea maturity, managing relationships between ideas, or reviewing the idea pipeline. NOT for tasks — use denote-tasks for actionable work items.
+description: Agent-first idea management using the anote CLI. Use when capturing ideas, tracking idea maturity, managing relationships between ideas, or reviewing the idea pipeline. NOT for tasks (use atask) or contacts (use apeople).
 ---
 
 # anote — Agent-First Idea Management
 
-Manage ideas using the anote CLI tool. Ideas are things that **mature** rather than things that get **done**. This is a sibling tool to denote-tasks (atask) — use anote for thinking, atask for doing.
+Manage ideas using the anote CLI tool. Ideas are things that **mature** rather than things that get **done**. This is a sibling tool to atask (tasks) and apeople (contacts) — use anote for thinking, atask for doing, apeople for relationships.
 
 **IMPORTANT: Everything is an idea.** Aspirations and beliefs are both ideas — they are managed with the same `anote` commands and stored in the same ideas directory. The `kind` field is simply a property on an idea, like `state` or `maturity`. Never create separate files or use different tools for different kinds of ideas. Always use `anote`.
 
@@ -125,12 +125,31 @@ Tags update both the filename and frontmatter.
 ```bash
 anote link 5 8                      # Bidirectional link
 ```
-Both ideas get each other's Denote ID in their `related` array. Ideas of any kind can be linked to each other.
+Both ideas get each other's Denote ID in their `related_ideas` array. Ideas of any kind can be linked to each other.
 
 ### Link to atask Project
 ```bash
 anote project 5 20260215T140000     # Link to project by Denote ID
 ```
+Adds the project's Denote ID to the idea's `related_tasks` array.
+
+### Cross-App Relationships
+
+Link ideas to contacts (apeople), tasks (atask), or other ideas using Denote IDs:
+
+```bash
+# Add relationships
+anote update 5 --add-person 20250612T080000
+anote update 5 --add-task 20250610T141230
+anote update 5 --add-idea 20250607T093045
+
+# Remove relationships
+anote update 5 --remove-person 20250612T080000
+anote update 5 --remove-task 20250610T141230
+anote update 5 --remove-idea 20250607T093045
+```
+
+Relationship fields in frontmatter: `related_people`, `related_tasks`, `related_ideas` (arrays of Denote IDs). These are NOT automatically bidirectional — update both entities to link both directions.
 
 ## Agent Workflow Patterns
 
@@ -241,8 +260,9 @@ kind: aspiration
 state: active
 maturity: crawl
 tags: [coaching, leadership]
-related: ["20260301T091500"]
-project: ["20260215T140000"]
+related_ideas: ["20260301T091500"]
+related_tasks: ["20260215T140000"]
+related_people: []
 created: "2026-02-16T10:30:45-08:00"
 modified: "2026-02-16T11:15:22-08:00"
 ---
