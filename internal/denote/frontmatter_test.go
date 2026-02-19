@@ -49,8 +49,8 @@ func TestFrontmatterRoundTrip(t *testing.T) {
 		State:    StateActive,
 		Maturity: MaturityCrawl,
 		Tags:     []string{"testing", "roundtrip"},
-		Related:  []string{"20260301T091500"},
-		Project:  []string{"20260215T140000"},
+		RelatedIdeas: []string{"20260301T091500"},
+		RelatedTasks: []string{"20260215T140000"},
 		Created:  "2026-02-16T10:30:45Z",
 		Modified: "2026-02-16T11:15:22Z",
 	}
@@ -89,11 +89,11 @@ func TestFrontmatterRoundTrip(t *testing.T) {
 	if len(idea.IdeaMetadata.Tags) != len(original.Tags) {
 		t.Errorf("Tags: got %v, want %v", idea.IdeaMetadata.Tags, original.Tags)
 	}
-	if len(idea.Related) != 1 || idea.Related[0] != "20260301T091500" {
-		t.Errorf("Related: got %v", idea.Related)
+	if len(idea.RelatedIdeas) != 1 || idea.RelatedIdeas[0] != "20260301T091500" {
+		t.Errorf("RelatedIdeas: got %v", idea.RelatedIdeas)
 	}
-	if len(idea.Project) != 1 || idea.Project[0] != "20260215T140000" {
-		t.Errorf("Project: got %v", idea.Project)
+	if len(idea.RelatedTasks) != 1 || idea.RelatedTasks[0] != "20260215T140000" {
+		t.Errorf("RelatedTasks: got %v", idea.RelatedTasks)
 	}
 	if idea.Created != original.Created {
 		t.Errorf("Created: got %q, want %q", idea.Created, original.Created)
@@ -169,10 +169,13 @@ func TestWriteFrontmatter_OmitsEmptyFields(t *testing.T) {
 	if strings.Contains(fm, "rejected_reason") {
 		t.Error("empty rejected_reason should be omitted")
 	}
-	if strings.Contains(fm, "related") {
-		t.Error("empty related should be omitted")
+	if strings.Contains(fm, "related_ideas") {
+		t.Error("empty related_ideas should be omitted")
 	}
-	if strings.Contains(fm, "project") {
-		t.Error("empty project should be omitted")
+	if strings.Contains(fm, "related_tasks") {
+		t.Error("empty related_tasks should be omitted")
+	}
+	if strings.Contains(fm, "related_people") {
+		t.Error("empty related_people should be omitted")
 	}
 }

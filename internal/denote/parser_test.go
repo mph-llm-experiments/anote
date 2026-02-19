@@ -153,11 +153,11 @@ This is about coaching non-traditional managers.
 	if len(idea.IdeaMetadata.Tags) != 2 {
 		t.Errorf("Tags: got %v, want 2 tags", idea.IdeaMetadata.Tags)
 	}
-	if len(idea.Related) != 1 || idea.Related[0] != "20260301T091500" {
-		t.Errorf("Related: got %v, want [20260301T091500]", idea.Related)
+	if len(idea.RelatedIdeas) != 1 || idea.RelatedIdeas[0] != "20260301T091500" {
+		t.Errorf("RelatedIdeas: got %v, want [20260301T091500]", idea.RelatedIdeas)
 	}
-	if len(idea.Project) != 1 || idea.Project[0] != "20260215T140000" {
-		t.Errorf("Project: got %v, want [20260215T140000]", idea.Project)
+	if len(idea.RelatedTasks) != 1 || idea.RelatedTasks[0] != "20260215T140000" {
+		t.Errorf("RelatedTasks: got %v, want [20260215T140000]", idea.RelatedTasks)
 	}
 	if idea.Created != "2026-02-16T10:30:45Z" {
 		t.Errorf("Created: got %q", idea.Created)

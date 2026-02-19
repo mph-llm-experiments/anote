@@ -109,11 +109,36 @@ type IdeaMetadata struct {
 	State          string   `yaml:"state,omitempty" json:"state,omitempty"`
 	Maturity       string   `yaml:"maturity,omitempty" json:"maturity,omitempty"`
 	Tags           []string `yaml:"tags,omitempty" json:"tags,omitempty"`
-	Related        []string `yaml:"related,omitempty" json:"related,omitempty"`
-	Project        []string `yaml:"project,omitempty" json:"project,omitempty"`
 	RejectedReason string   `yaml:"rejected_reason,omitempty" json:"rejected_reason,omitempty"`
 	Created        string   `yaml:"created,omitempty" json:"created,omitempty"`
 	Modified       string   `yaml:"modified,omitempty" json:"modified,omitempty"`
+
+	// Cross-app relationship fields (asystem connective tissue)
+	// Renamed from "related" and "project" for ecosystem consistency
+	RelatedPeople []string `yaml:"related_people,omitempty" json:"related_people"`
+	RelatedTasks  []string `yaml:"related_tasks,omitempty" json:"related_tasks"`
+	RelatedIdeas  []string `yaml:"related_ideas,omitempty" json:"related_ideas"`
+}
+
+// EnsureRelationSlices initializes nil relation slices to empty slices
+// so JSON output shows [] instead of null.
+func (m *IdeaMetadata) EnsureRelationSlices() {
+	if m.RelatedPeople == nil {
+		m.RelatedPeople = []string{}
+	}
+	if m.RelatedTasks == nil {
+		m.RelatedTasks = []string{}
+	}
+	if m.RelatedIdeas == nil {
+		m.RelatedIdeas = []string{}
+	}
+}
+
+// ideaMetadataLegacy is used for backward-compatible YAML parsing.
+// It reads the old field names ("related", "project") from existing files.
+type ideaMetadataLegacy struct {
+	Related []string `yaml:"related,omitempty"`
+	Project []string `yaml:"project,omitempty"`
 }
 
 // Idea combines File info with IdeaMetadata and content.

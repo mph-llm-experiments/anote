@@ -115,6 +115,19 @@ func parseFrontmatter(content []byte) (*IdeaMetadata, error) {
 		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
 	}
 
+	// Backward compat: read old "related" and "project" field names
+	var legacy ideaMetadataLegacy
+	if err := yaml.Unmarshal([]byte(fmStr), &legacy); err == nil {
+		if len(legacy.Related) > 0 && len(meta.RelatedIdeas) == 0 {
+			meta.RelatedIdeas = legacy.Related
+		}
+		if len(legacy.Project) > 0 && len(meta.RelatedTasks) == 0 {
+			meta.RelatedTasks = legacy.Project
+		}
+	}
+
+	meta.EnsureRelationSlices()
+
 	return &meta, nil
 }
 
