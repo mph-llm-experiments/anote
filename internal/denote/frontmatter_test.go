@@ -5,59 +5,68 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mph-llm-experiments/acore"
 )
 
-func TestWriteFrontmatter(t *testing.T) {
-	meta := &IdeaMetadata{
-		Title:   "Test Idea",
-		IndexID: 1,
-		Type:    TypeIdea,
-		State:   StateSeed,
-		Tags:    []string{"coaching"},
-		Created: "2026-02-16T10:30:45Z",
+func TestWriteIdeaFile(t *testing.T) {
+	dir := t.TempDir()
+
+	idea := &Idea{}
+	idea.ID = "01TESTID0000000000000000EF"
+	idea.Title = "Test Idea"
+	idea.IndexID = 1
+	idea.Type = TypeIdea
+	idea.Tags = []string{"idea", "coaching"}
+	idea.Created = "2026-02-16T10:30:45Z"
+	idea.Modified = "2026-02-16T10:30:45Z"
+	idea.State = StateSeed
+	idea.Kind = KindAspiration
+
+	path := filepath.Join(dir, "01TESTID0000000000000000EF--test-idea__idea.md")
+
+	if err := WriteIdeaFile(path, idea, ""); err != nil {
+		t.Fatalf("WriteIdeaFile: %v", err)
 	}
 
-	fm, err := WriteFrontmatter(meta)
+	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("WriteFrontmatter: %v", err)
+		t.Fatalf("ReadFile: %v", err)
 	}
 
-	if !strings.HasPrefix(fm, "---\n") {
-		t.Error("frontmatter should start with ---")
+	content := string(data)
+	if !strings.HasPrefix(content, "---\n") {
+		t.Error("file should start with ---")
 	}
-	if !strings.HasSuffix(fm, "---\n") {
-		t.Error("frontmatter should end with ---")
+	if !strings.Contains(content, "title: Test Idea") {
+		t.Error("file should contain title")
 	}
-	if !strings.Contains(fm, "title: Test Idea") {
-		t.Error("frontmatter should contain title")
+	if !strings.Contains(content, "index_id: 1") {
+		t.Error("file should contain index_id")
 	}
-	if !strings.Contains(fm, "index_id: 1") {
-		t.Error("frontmatter should contain index_id")
-	}
-	if !strings.Contains(fm, "state: seed") {
-		t.Error("frontmatter should contain state")
+	if !strings.Contains(content, "state: seed") {
+		t.Error("file should contain state")
 	}
 }
 
 func TestFrontmatterRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
-	original := &IdeaMetadata{
-		Title:    "Round Trip Test",
-		IndexID:  42,
-		Type:     TypeIdea,
-		State:    StateActive,
-		Maturity: MaturityCrawl,
-		Tags:     []string{"testing", "roundtrip"},
-		RelatedIdeas: []string{"20260301T091500"},
-		RelatedTasks: []string{"20260215T140000"},
-		Created:  "2026-02-16T10:30:45Z",
-		Modified: "2026-02-16T11:15:22Z",
-	}
+	original := &Idea{}
+	original.ID = "01TESTID0000000000000000GH"
+	original.Title = "Round Trip Test"
+	original.IndexID = 42
+	original.Type = TypeIdea
+	original.Tags = []string{"idea", "testing", "roundtrip"}
+	original.Created = "2026-02-16T10:30:45Z"
+	original.Modified = "2026-02-16T11:15:22Z"
+	original.State = StateActive
+	original.Maturity = MaturityCrawl
+	original.Kind = KindAspiration
+	original.RelatedIdeas = []string{"20260301T091500"}
+	original.RelatedTasks = []string{"20260215T140000"}
 
-	filename := "20260216T103045--round-trip-test__idea_testing.md"
-	path := filepath.Join(dir, filename)
-
+	path := filepath.Join(dir, "01TESTID0000000000000000GH--round-trip-test__idea.md")
 	bodyContent := "## The Idea\n\nSome content here.\n"
 
 	if err := WriteIdeaFile(path, original, bodyContent); err != nil {
@@ -71,8 +80,8 @@ func TestFrontmatterRoundTrip(t *testing.T) {
 	}
 
 	// Verify all fields round-tripped
-	if idea.IdeaMetadata.Title != original.Title {
-		t.Errorf("Title: got %q, want %q", idea.IdeaMetadata.Title, original.Title)
+	if idea.Title != original.Title {
+		t.Errorf("Title: got %q, want %q", idea.Title, original.Title)
 	}
 	if idea.IndexID != original.IndexID {
 		t.Errorf("IndexID: got %d, want %d", idea.IndexID, original.IndexID)
@@ -86,8 +95,8 @@ func TestFrontmatterRoundTrip(t *testing.T) {
 	if idea.Maturity != original.Maturity {
 		t.Errorf("Maturity: got %q, want %q", idea.Maturity, original.Maturity)
 	}
-	if len(idea.IdeaMetadata.Tags) != len(original.Tags) {
-		t.Errorf("Tags: got %v, want %v", idea.IdeaMetadata.Tags, original.Tags)
+	if len(idea.Tags) != len(original.Tags) {
+		t.Errorf("Tags: got %v, want %v", idea.Tags, original.Tags)
 	}
 	if len(idea.RelatedIdeas) != 1 || idea.RelatedIdeas[0] != "20260301T091500" {
 		t.Errorf("RelatedIdeas: got %v", idea.RelatedIdeas)
@@ -103,37 +112,39 @@ func TestFrontmatterRoundTrip(t *testing.T) {
 	}
 }
 
-func TestUpdateFrontmatter_PreservesContent(t *testing.T) {
+func TestUpdateIdeaFrontmatter_PreservesContent(t *testing.T) {
 	dir := t.TempDir()
 
-	original := &IdeaMetadata{
-		Title:   "Preserve Content",
-		IndexID: 1,
-		Type:    TypeIdea,
-		State:   StateSeed,
-		Created: "2026-02-16T10:30:45Z",
-	}
+	original := &Idea{}
+	original.ID = "01TESTID0000000000000000IJ"
+	original.Title = "Preserve Content"
+	original.IndexID = 1
+	original.Type = TypeIdea
+	original.Tags = []string{"idea"}
+	original.Created = "2026-02-16T10:30:45Z"
+	original.Modified = "2026-02-16T10:30:45Z"
+	original.State = StateSeed
 
 	bodyContent := "## My Idea\n\nThis content should survive frontmatter updates.\n"
-	filename := "20260216T103045--preserve-content__idea.md"
-	path := filepath.Join(dir, filename)
+	path := filepath.Join(dir, "01TESTID0000000000000000IJ--preserve-content__idea.md")
 
 	if err := WriteIdeaFile(path, original, bodyContent); err != nil {
 		t.Fatalf("WriteIdeaFile: %v", err)
 	}
 
 	// Update frontmatter
-	updated := &IdeaMetadata{
-		Title:    "Preserve Content",
-		IndexID:  1,
-		Type:     TypeIdea,
-		State:    StateDraft,
-		Modified: "2026-02-16T12:00:00Z",
-		Created:  "2026-02-16T10:30:45Z",
-	}
+	updated := &Idea{}
+	updated.ID = original.ID
+	updated.Title = original.Title
+	updated.IndexID = original.IndexID
+	updated.Type = original.Type
+	updated.Tags = original.Tags
+	updated.Created = original.Created
+	updated.Modified = "2026-02-16T12:00:00Z"
+	updated.State = StateDraft
 
-	if err := UpdateFrontmatter(path, updated); err != nil {
-		t.Fatalf("UpdateFrontmatter: %v", err)
+	if err := UpdateIdeaFrontmatter(path, updated); err != nil {
+		t.Fatalf("UpdateIdeaFrontmatter: %v", err)
 	}
 
 	// Read back
@@ -151,31 +162,43 @@ func TestUpdateFrontmatter_PreservesContent(t *testing.T) {
 	}
 }
 
-func TestWriteFrontmatter_OmitsEmptyFields(t *testing.T) {
-	meta := &IdeaMetadata{
-		Title:   "Minimal",
-		IndexID: 1,
-		State:   StateSeed,
+func TestWriteIdeaFile_OmitsEmptyFields(t *testing.T) {
+	dir := t.TempDir()
+
+	idea := &Idea{}
+	idea.ID = "01TESTID0000000000000000KL"
+	idea.Title = "Minimal"
+	idea.IndexID = 1
+	idea.Type = TypeIdea
+	idea.State = StateSeed
+	idea.Created = acore.Now()
+	idea.Modified = idea.Created
+
+	path := filepath.Join(dir, "01TESTID0000000000000000KL--minimal__idea.md")
+
+	if err := WriteIdeaFile(path, idea, ""); err != nil {
+		t.Fatalf("WriteIdeaFile: %v", err)
 	}
 
-	fm, err := WriteFrontmatter(meta)
+	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("WriteFrontmatter: %v", err)
+		t.Fatalf("ReadFile: %v", err)
 	}
 
-	if strings.Contains(fm, "maturity") {
+	content := string(data)
+	if strings.Contains(content, "maturity") {
 		t.Error("empty maturity should be omitted")
 	}
-	if strings.Contains(fm, "rejected_reason") {
+	if strings.Contains(content, "rejected_reason") {
 		t.Error("empty rejected_reason should be omitted")
 	}
-	if strings.Contains(fm, "related_ideas") {
+	if strings.Contains(content, "related_ideas") {
 		t.Error("empty related_ideas should be omitted")
 	}
-	if strings.Contains(fm, "related_tasks") {
+	if strings.Contains(content, "related_tasks") {
 		t.Error("empty related_tasks should be omitted")
 	}
-	if strings.Contains(fm, "related_people") {
+	if strings.Contains(content, "related_people") {
 		t.Error("empty related_people should be omitted")
 	}
 }

@@ -10,9 +10,6 @@ import (
 )
 
 func TestCreateIdea_Basic(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
 	dir := t.TempDir()
 
 	idea, err := CreateIdea(dir, "My test idea", nil, "")
@@ -20,8 +17,8 @@ func TestCreateIdea_Basic(t *testing.T) {
 		t.Fatalf("CreateIdea: %v", err)
 	}
 
-	if idea.IdeaMetadata.Title != "My test idea" {
-		t.Errorf("Title: got %q, want %q", idea.IdeaMetadata.Title, "My test idea")
+	if idea.Title != "My test idea" {
+		t.Errorf("Title: got %q, want %q", idea.Title, "My test idea")
 	}
 
 	if idea.IndexID != 1 {
@@ -40,16 +37,17 @@ func TestCreateIdea_Basic(t *testing.T) {
 		t.Error("Created should not be empty")
 	}
 
+	if idea.ID == "" {
+		t.Error("ID (ULID) should not be empty")
+	}
+
 	// File should exist
-	if _, err := os.Stat(idea.File.Path); os.IsNotExist(err) {
-		t.Errorf("file should exist: %s", idea.File.Path)
+	if _, err := os.Stat(idea.FilePath); os.IsNotExist(err) {
+		t.Errorf("file should exist: %s", idea.FilePath)
 	}
 }
 
 func TestCreateIdea_IdeaTagAlwaysInFilename(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
 	dir := t.TempDir()
 
 	idea, err := CreateIdea(dir, "Tag test", nil, "")
@@ -57,16 +55,13 @@ func TestCreateIdea_IdeaTagAlwaysInFilename(t *testing.T) {
 		t.Fatalf("CreateIdea: %v", err)
 	}
 
-	filename := filepath.Base(idea.File.Path)
+	filename := filepath.Base(idea.FilePath)
 	if !strings.Contains(filename, "__idea") {
 		t.Errorf("filename should contain __idea: %s", filename)
 	}
 }
 
 func TestCreateIdea_WithTags(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
 	dir := t.TempDir()
 
 	idea, err := CreateIdea(dir, "Tagged idea", []string{"coaching", "leadership"}, "")
@@ -74,41 +69,36 @@ func TestCreateIdea_WithTags(t *testing.T) {
 		t.Fatalf("CreateIdea: %v", err)
 	}
 
-	// Tags should be in filename
-	filename := filepath.Base(idea.File.Path)
-	if !strings.Contains(filename, "__idea_coaching_leadership") {
-		t.Errorf("filename should contain tags: %s", filename)
+	// Tags should be in frontmatter (with "idea" first)
+	if len(idea.Tags) != 3 {
+		t.Errorf("frontmatter tags: got %v, want [idea, coaching, leadership]", idea.Tags)
 	}
-
-	// Tags should be in frontmatter
-	if len(idea.IdeaMetadata.Tags) != 2 {
-		t.Errorf("frontmatter tags: got %v, want [coaching, leadership]", idea.IdeaMetadata.Tags)
+	if idea.Tags[0] != "idea" {
+		t.Errorf("first tag should be 'idea', got %q", idea.Tags[0])
 	}
 }
 
 func TestCreateIdea_IdeaTagNotDuplicated(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
 	dir := t.TempDir()
 
-	// Pass "idea" as a user tag — should not appear twice in filename
+	// Pass "idea" as a user tag — should not appear twice
 	idea, err := CreateIdea(dir, "Dedup test", []string{"idea", "coaching"}, "")
 	if err != nil {
 		t.Fatalf("CreateIdea: %v", err)
 	}
 
-	filename := filepath.Base(idea.File.Path)
-	// Should be __idea_coaching, not __idea_idea_coaching
-	if strings.Contains(filename, "idea_idea") {
-		t.Errorf("idea tag should not be duplicated in filename: %s", filename)
+	ideaCount := 0
+	for _, tag := range idea.Tags {
+		if tag == "idea" {
+			ideaCount++
+		}
+	}
+	if ideaCount != 1 {
+		t.Errorf("idea tag should appear exactly once, got %d times in %v", ideaCount, idea.Tags)
 	}
 }
 
 func TestCreateIdea_SequentialIDs(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
 	dir := t.TempDir()
 
 	idea1, err := CreateIdea(dir, "First", nil, "")
@@ -138,9 +128,6 @@ func TestCreateIdea_SequentialIDs(t *testing.T) {
 }
 
 func TestCreateIdea_WithKind(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
 	dir := t.TempDir()
 
 	idea, err := CreateIdea(dir, "Chaos is unsustainable", nil, "belief")
@@ -158,9 +145,6 @@ func TestCreateIdea_WithKind(t *testing.T) {
 }
 
 func TestCreateIdea_DefaultKind(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
 	dir := t.TempDir()
 
 	idea, err := CreateIdea(dir, "Build a widget", nil, "")
@@ -173,10 +157,7 @@ func TestCreateIdea_DefaultKind(t *testing.T) {
 	}
 }
 
-func TestCreateIdea_DenoteFilenameFormat(t *testing.T) {
-	denote.ResetSingleton()
-	defer denote.ResetSingleton()
-
+func TestCreateIdea_ULIDFilenameFormat(t *testing.T) {
 	dir := t.TempDir()
 
 	idea, err := CreateIdea(dir, "My Great Idea", nil, "")
@@ -184,20 +165,20 @@ func TestCreateIdea_DenoteFilenameFormat(t *testing.T) {
 		t.Fatalf("CreateIdea: %v", err)
 	}
 
-	filename := filepath.Base(idea.File.Path)
+	filename := filepath.Base(idea.FilePath)
 
-	// Should match Denote pattern
-	p := denote.NewParser()
-	file, err := p.ParseFilename(filename)
-	if err != nil {
-		t.Fatalf("filename should be valid Denote format: %v", err)
+	// Should end with __idea.md
+	if !strings.HasSuffix(filename, "__idea.md") {
+		t.Errorf("filename should end with __idea.md: %s", filename)
 	}
 
-	if file.Slug != "my-great-idea" {
-		t.Errorf("slug: got %q, want %q", file.Slug, "my-great-idea")
+	// Should contain the slug
+	if !strings.Contains(filename, "my-great-idea") {
+		t.Errorf("filename should contain slug: %s", filename)
 	}
 
-	if !file.IsIdea() {
-		t.Error("file should be recognized as an idea")
+	// ID should be 26 chars (ULID)
+	if len(idea.ID) != 26 {
+		t.Errorf("ID should be 26 chars (ULID): got %d chars (%s)", len(idea.ID), idea.ID)
 	}
 }

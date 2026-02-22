@@ -58,6 +58,7 @@ Global Options:
 		ideaTagCommand(cfg),
 		ideaLinkCommand(cfg),
 		ideaProjectCommand(cfg),
+		ideaMigrateCommand(cfg),
 	)
 
 	if len(remaining) == 0 {

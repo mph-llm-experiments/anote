@@ -23,8 +23,8 @@ func FindIdeaByID(dir string, id int) (*denote.Idea, error) {
 	return nil, fmt.Errorf("idea %d not found", id)
 }
 
-// FindIdeaByDenoteID finds an idea by its Denote timestamp ID.
-func FindIdeaByDenoteID(dir string, denoteID string) (*denote.Idea, error) {
+// FindIdeaByEntityID finds an idea by its entity ID (ULID or legacy Denote ID).
+func FindIdeaByEntityID(dir string, entityID string) (*denote.Idea, error) {
 	scanner := denote.NewScanner(dir)
 	ideas, err := scanner.FindIdeas()
 	if err != nil {
@@ -32,10 +32,10 @@ func FindIdeaByDenoteID(dir string, denoteID string) (*denote.Idea, error) {
 	}
 
 	for _, idea := range ideas {
-		if idea.ID == denoteID {
+		if idea.ID == entityID {
 			return idea, nil
 		}
 	}
 
-	return nil, fmt.Errorf("idea with Denote ID %s not found", denoteID)
+	return nil, fmt.Errorf("idea with ID %s not found", entityID)
 }

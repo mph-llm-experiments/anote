@@ -1,12 +1,10 @@
 package denote
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
+	"github.com/mph-llm-experiments/acore"
 )
 
-// Scanner finds and loads Denote files from a directory.
+// Scanner finds and loads idea files from a directory.
 type Scanner struct {
 	BaseDir string
 }
@@ -18,15 +16,15 @@ func NewScanner(dir string) *Scanner {
 
 // FindIdeas finds and parses all idea files in the directory.
 func (s *Scanner) FindIdeas() ([]*Idea, error) {
-	pattern := filepath.Join(s.BaseDir, "*__idea*.md")
-	files, err := filepath.Glob(pattern)
+	sc := &acore.Scanner{Dir: s.BaseDir}
+	paths, err := sc.FindByType(TypeIdea)
 	if err != nil {
-		return nil, fmt.Errorf("failed to glob idea files: %w", err)
+		return nil, err
 	}
 
 	var ideas []*Idea
-	for _, file := range files {
-		idea, err := ParseIdeaFile(file)
+	for _, path := range paths {
+		idea, err := ParseIdeaFile(path)
 		if err != nil {
 			continue
 		}
@@ -34,29 +32,4 @@ func (s *Scanner) FindIdeas() ([]*Idea, error) {
 	}
 
 	return ideas, nil
-}
-
-// FindAllIdeaFiles returns basic file info for all idea files.
-func (s *Scanner) FindAllIdeaFiles() ([]File, error) {
-	pattern := filepath.Join(s.BaseDir, "*__idea*.md")
-	paths, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, fmt.Errorf("failed to glob idea files: %w", err)
-	}
-
-	parser := NewParser()
-	var allFiles []File
-	for _, path := range paths {
-		file, err := parser.ParseFilename(filepath.Base(path))
-		if err != nil {
-			continue
-		}
-		file.Path = path
-		if info, err := os.Stat(path); err == nil {
-			file.ModTime = info.ModTime()
-		}
-		allFiles = append(allFiles, *file)
-	}
-
-	return allFiles, nil
 }

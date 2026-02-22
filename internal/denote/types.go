@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/mph-llm-experiments/acore"
 )
 
 // State constants for the idea lifecycle.
@@ -34,119 +36,22 @@ const (
 // Type constant.
 const TypeIdea = "idea"
 
-// File represents the basic Denote file structure.
-type File struct {
-	ID      string    `json:"denote_id"`
-	Title   string    `json:"-"`
-	Slug    string    `json:"slug,omitempty"`
-	Tags    []string  `json:"filename_tags,omitempty"`
-	Path    string    `json:"path,omitempty"`
-	ModTime time.Time `json:"-"`
-}
-
-// IsIdea checks if the file is an idea based on filename tags.
-func (f *File) IsIdea() bool {
-	return f.HasTag("idea")
-}
-
-// HasTag checks if the file has a specific tag.
-func (f *File) HasTag(tag string) bool {
-	for _, t := range f.Tags {
-		if t == tag {
-			return true
-		}
-	}
-	return false
-}
-
-// MatchesSearch checks if the file matches a search query.
-func (f *File) MatchesSearch(query string) bool {
-	query = strings.ToLower(query)
-	if fuzzyMatch(strings.ToLower(f.Title), query) {
-		return true
-	}
-	if fuzzyMatch(strings.ToLower(f.Slug), query) {
-		return true
-	}
-	for _, tag := range f.Tags {
-		if fuzzyMatch(strings.ToLower(tag), query) {
-			return true
-		}
-	}
-	return false
-}
-
-// MatchesTag checks if the file has a tag matching the query.
-func (f *File) MatchesTag(query string) bool {
-	query = strings.ToLower(query)
-	for _, tag := range f.Tags {
-		if fuzzyMatch(strings.ToLower(tag), query) {
-			return true
-		}
-	}
-	return false
-}
-
-func fuzzyMatch(text, pattern string) bool {
-	if pattern == "" {
-		return true
-	}
-	patternIdx := 0
-	for _, ch := range text {
-		if patternIdx < len(pattern) && ch == rune(pattern[patternIdx]) {
-			patternIdx++
-		}
-	}
-	return patternIdx == len(pattern)
-}
-
-// IdeaMetadata represents idea-specific YAML frontmatter.
+// IdeaMetadata holds domain-specific idea fields.
+// Common fields (ID, Title, IndexID, Type, Tags, Created, Modified,
+// RelatedPeople, RelatedTasks, RelatedIdeas) come from embedded acore.Entity.
 type IdeaMetadata struct {
-	Title          string   `yaml:"title" json:"title"`
-	IndexID        int      `yaml:"index_id" json:"index_id"`
-	Type           string   `yaml:"type,omitempty" json:"type,omitempty"`
-	Kind           string   `yaml:"kind,omitempty" json:"kind,omitempty"`
-	State          string   `yaml:"state,omitempty" json:"state,omitempty"`
-	Maturity       string   `yaml:"maturity,omitempty" json:"maturity,omitempty"`
-	Tags           []string `yaml:"tags,omitempty" json:"tags,omitempty"`
-	RejectedReason string   `yaml:"rejected_reason,omitempty" json:"rejected_reason,omitempty"`
-	Created        string   `yaml:"created,omitempty" json:"created,omitempty"`
-	Modified       string   `yaml:"modified,omitempty" json:"modified,omitempty"`
-
-	// Cross-app relationship fields (asystem connective tissue)
-	// Renamed from "related" and "project" for ecosystem consistency
-	RelatedPeople []string `yaml:"related_people,omitempty" json:"related_people"`
-	RelatedTasks  []string `yaml:"related_tasks,omitempty" json:"related_tasks"`
-	RelatedIdeas  []string `yaml:"related_ideas,omitempty" json:"related_ideas"`
+	Kind           string `yaml:"kind,omitempty" json:"kind,omitempty"`
+	State          string `yaml:"state,omitempty" json:"state,omitempty"`
+	Maturity       string `yaml:"maturity,omitempty" json:"maturity,omitempty"`
+	RejectedReason string `yaml:"rejected_reason,omitempty" json:"rejected_reason,omitempty"`
 }
 
-// EnsureRelationSlices initializes nil relation slices to empty slices
-// so JSON output shows [] instead of null.
-func (m *IdeaMetadata) EnsureRelationSlices() {
-	if m.RelatedPeople == nil {
-		m.RelatedPeople = []string{}
-	}
-	if m.RelatedTasks == nil {
-		m.RelatedTasks = []string{}
-	}
-	if m.RelatedIdeas == nil {
-		m.RelatedIdeas = []string{}
-	}
-}
-
-// ideaMetadataLegacy is used for backward-compatible YAML parsing.
-// It reads the old field names ("related", "project") from existing files.
-type ideaMetadataLegacy struct {
-	Related []string `yaml:"related,omitempty"`
-	Project []string `yaml:"project,omitempty"`
-}
-
-// Idea combines File info with IdeaMetadata and content.
+// Idea combines acore.Entity with idea-specific metadata and content.
 type Idea struct {
-	File
-	IdeaMetadata
-	Content string    `json:"-"`
-	ModTime time.Time `json:"modified_at"`
+	acore.Entity `yaml:",inline"`
+	IdeaMetadata `yaml:",inline"`
+	Content      string    `yaml:"-" json:"-"`
+	ModTime      time.Time `yaml:"-" json:"-"`
 }
 
 // IsValidState checks if a state value is valid.

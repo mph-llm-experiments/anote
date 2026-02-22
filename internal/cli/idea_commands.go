@@ -10,19 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mph-llm-experiments/acore"
 	"github.com/mph-llm-experiments/anote/internal/config"
 	"github.com/mph-llm-experiments/anote/internal/denote"
 	"github.com/mph-llm-experiments/anote/internal/idea"
 )
-
-// tagList is a flag.Value that collects repeated --tag flags.
-type tagList []string
-
-func (t *tagList) String() string { return strings.Join(*t, ", ") }
-func (t *tagList) Set(value string) error {
-	*t = append(*t, strings.TrimSpace(value))
-	return nil
-}
 
 func ideaNewCommand(cfg *config.Config) *Command {
 	cmd := &Command{
@@ -63,8 +55,14 @@ func ideaNewCommand(cfg *config.Config) *Command {
 			return err
 		}
 
+		if globalFlags.JSON {
+			data, _ := json.MarshalIndent(created, "", "  ")
+			fmt.Println(string(data))
+			return nil
+		}
+
 		if !globalFlags.Quiet {
-			fmt.Printf("Created idea #%d: %q (%s)\n", created.IndexID, created.IdeaMetadata.Title, created.File.Path)
+			fmt.Printf("Created idea #%d: %q (%s)\n", created.IndexID, created.Title, created.FilePath)
 		}
 
 		return nil
@@ -159,19 +157,10 @@ func ideaListCommand(cfg *config.Config) *Command {
 
 			if tag != "" {
 				found := false
-				for _, t := range i.IdeaMetadata.Tags {
+				for _, t := range i.Tags {
 					if t == tag {
 						found = true
 						break
-					}
-				}
-				// Also check filename tags
-				if !found {
-					for _, t := range i.File.Tags {
-						if t == tag {
-							found = true
-							break
-						}
 					}
 				}
 				if !found {
@@ -185,10 +174,7 @@ func ideaListCommand(cfg *config.Config) *Command {
 		// JSON output — use kind-specific display labels
 		if globalFlags.JSON {
 			type jsonIdea struct {
-				DenoteID string    `json:"denote_id"`
-				Path     string    `json:"path"`
-				ModTime  time.Time `json:"modified_at"`
-				denote.IdeaMetadata
+				denote.Idea
 			}
 			var output []jsonIdea
 			for _, i := range filtered {
@@ -196,12 +182,7 @@ func ideaListCommand(cfg *config.Config) *Command {
 				if ek == "" {
 					ek = denote.KindAspiration
 				}
-				ji := jsonIdea{
-					DenoteID:     i.File.ID,
-					Path:         i.File.Path,
-					ModTime:      i.ModTime,
-					IdeaMetadata: i.IdeaMetadata,
-				}
+				ji := jsonIdea{Idea: *i}
 				ji.State = denote.DisplayState(i.State, ek)
 				ji.Kind = ek
 				output = append(output, ji)
@@ -243,9 +224,9 @@ func ideaListCommand(cfg *config.Config) *Command {
 				mat = "-"
 			}
 
-			tags := strings.Join(i.IdeaMetadata.Tags, ", ")
+			tags := strings.Join(i.Tags, ", ")
 
-			title := i.IdeaMetadata.Title
+			title := i.Title
 			if len(title) > 38 {
 				title = title[:35] + "..."
 			}
@@ -261,15 +242,18 @@ func ideaListCommand(cfg *config.Config) *Command {
 
 var denoteIDPattern = regexp.MustCompile(`^\d{8}T\d{6}$`)
 
-// lookupIdea finds an idea by index_id (number) or Denote ID (timestamp).
+// lookupIdea finds an idea by index_id (number) or entity ID (ULID or legacy Denote ID).
 func lookupIdea(dir string, ref string) (*denote.Idea, error) {
+	// Try as Denote timestamp ID
 	if denoteIDPattern.MatchString(ref) {
-		return idea.FindIdeaByDenoteID(dir, ref)
+		return idea.FindIdeaByEntityID(dir, ref)
 	}
 
+	// Try as integer index_id
 	id, err := strconv.Atoi(ref)
 	if err != nil {
-		return nil, fmt.Errorf("invalid idea reference %q: use a number or Denote ID", ref)
+		// Must be a ULID
+		return idea.FindIdeaByEntityID(dir, ref)
 	}
 
 	return idea.FindIdeaByID(dir, id)
@@ -298,21 +282,15 @@ func ideaShowCommand(cfg *config.Config) *Command {
 		}
 		displayState := denote.DisplayState(i.State, effectiveKind)
 
-		// JSON output — use kind-specific display labels
+		// JSON output
 		if globalFlags.JSON {
 			type jsonIdea struct {
-				DenoteID string    `json:"denote_id"`
-				Path     string    `json:"path"`
-				ModTime  time.Time `json:"modified_at"`
-				denote.IdeaMetadata
+				denote.Idea
 				Content string `json:"content,omitempty"`
 			}
 			ji := jsonIdea{
-				DenoteID:     i.File.ID,
-				Path:         i.File.Path,
-				ModTime:      i.ModTime,
-				IdeaMetadata: i.IdeaMetadata,
-				Content:      extractIdeaContent(i.Content),
+				Idea:    *i,
+				Content: extractIdeaContent(i.Content),
 			}
 			ji.State = displayState
 			ji.Kind = effectiveKind
@@ -325,15 +303,15 @@ func ideaShowCommand(cfg *config.Config) *Command {
 		}
 
 		// Formatted output
-		fmt.Printf("Idea #%d: %s\n", i.IndexID, i.IdeaMetadata.Title)
-		fmt.Printf("Denote ID:  %s\n", i.File.ID)
+		fmt.Printf("Idea #%d: %s\n", i.IndexID, i.Title)
+		fmt.Printf("ID:         %s\n", i.ID)
 		fmt.Printf("Kind:       %s\n", effectiveKind)
 		fmt.Printf("State:      %s\n", displayState)
 		if i.Maturity != "" {
 			fmt.Printf("Maturity:   %s\n", i.Maturity)
 		}
-		if len(i.IdeaMetadata.Tags) > 0 {
-			fmt.Printf("Tags:       %s\n", strings.Join(i.IdeaMetadata.Tags, ", "))
+		if len(i.Tags) > 0 {
+			fmt.Printf("Tags:       %s\n", strings.Join(i.Tags, ", "))
 		}
 		if i.Created != "" {
 			fmt.Printf("Created:    %s\n", i.Created)
@@ -352,7 +330,7 @@ func ideaShowCommand(cfg *config.Config) *Command {
 			allIdeas, _ := scanner.FindIdeas()
 			idMap := make(map[string]string)
 			for _, a := range allIdeas {
-				idMap[a.File.ID] = a.IdeaMetadata.Title
+				idMap[a.ID] = a.Title
 			}
 			for _, relID := range i.RelatedIdeas {
 				title, ok := idMap[relID]
@@ -380,7 +358,7 @@ func ideaShowCommand(cfg *config.Config) *Command {
 			}
 		}
 
-		fmt.Printf("File:       %s\n", i.File.Path)
+		fmt.Printf("File:       %s\n", i.FilePath)
 
 		// Show content (everything after frontmatter)
 		content := extractIdeaContent(i.Content)
@@ -397,16 +375,21 @@ func ideaShowCommand(cfg *config.Config) *Command {
 func ideaUpdateCommand(cfg *config.Config) *Command {
 	cmd := &Command{
 		Name:        "update",
-		Usage:       "anote update <id> [--state STATE] [--maturity LEVEL] [--kind KIND]",
-		Description: "Update idea state, maturity, or kind",
+		Usage:       "anote update <id> [--title TITLE] [--state STATE] [--maturity LEVEL] [--kind KIND]",
+		Description: "Update idea title, state, maturity, or kind",
 	}
 
 	cmd.Run = func(c *Command, args []string) error {
 		// Manual flag parsing to allow: update <id> --state X or update --state X <id>
-		var state, maturity, kind, idRef string
+		var state, maturity, kind, title, idRef string
 		var addPerson, removePerson, addTask, removeTask, addIdea, removeIdea string
 		for idx := 0; idx < len(args); idx++ {
 			switch args[idx] {
+			case "--title":
+				if idx+1 < len(args) {
+					title = args[idx+1]
+					idx++
+				}
 			case "--state":
 				if idx+1 < len(args) {
 					state = args[idx+1]
@@ -464,13 +447,17 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 		}
 
 		hasRelationUpdate := addPerson != "" || removePerson != "" || addTask != "" || removeTask != "" || addIdea != "" || removeIdea != ""
-		if state == "" && maturity == "" && kind == "" && !hasRelationUpdate {
-			return fmt.Errorf("nothing to update: provide --state, --maturity, --kind, or relationship flags")
+		if state == "" && maturity == "" && kind == "" && title == "" && !hasRelationUpdate {
+			return fmt.Errorf("nothing to update: provide --title, --state, --maturity, --kind, or relationship flags")
 		}
 
 		i, err := lookupIdea(cfg.IdeasDirectory, idRef)
 		if err != nil {
 			return err
+		}
+
+		if title != "" {
+			i.Title = title
 		}
 
 		// Resolve display label to canonical state
@@ -483,7 +470,7 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			if !denote.IsValidState(state) {
 				return fmt.Errorf("invalid state %q", state)
 			}
-			i.IdeaMetadata.State = state
+			i.State = state
 		}
 
 		// Validate and set kind
@@ -491,7 +478,7 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			if !denote.IsValidKind(kind) {
 				return fmt.Errorf("invalid kind %q: use aspiration or belief", kind)
 			}
-			i.IdeaMetadata.Kind = kind
+			i.Kind = kind
 		}
 
 		// Validate and set maturity
@@ -499,33 +486,49 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			if !denote.IsValidMaturity(maturity) {
 				return fmt.Errorf("invalid maturity %q: use crawl, walk, or run", maturity)
 			}
-			i.IdeaMetadata.Maturity = maturity
+			i.Maturity = maturity
 		}
 
 		// Apply cross-app relationship updates
 		if addPerson != "" {
-			i.IdeaMetadata.RelatedPeople = addToSlice(i.IdeaMetadata.RelatedPeople, addPerson)
+			acore.AddRelation(&i.RelatedPeople, addPerson)
+			acore.SyncRelation(i.Type, i.ID, addPerson)
 		}
 		if removePerson != "" {
-			i.IdeaMetadata.RelatedPeople = removeFromSlice(i.IdeaMetadata.RelatedPeople, removePerson)
+			acore.RemoveRelation(&i.RelatedPeople, removePerson)
+			acore.UnsyncRelation(i.Type, i.ID, removePerson)
 		}
 		if addTask != "" {
-			i.IdeaMetadata.RelatedTasks = addToSlice(i.IdeaMetadata.RelatedTasks, addTask)
+			acore.AddRelation(&i.RelatedTasks, addTask)
+			acore.SyncRelation(i.Type, i.ID, addTask)
 		}
 		if removeTask != "" {
-			i.IdeaMetadata.RelatedTasks = removeFromSlice(i.IdeaMetadata.RelatedTasks, removeTask)
+			acore.RemoveRelation(&i.RelatedTasks, removeTask)
+			acore.UnsyncRelation(i.Type, i.ID, removeTask)
 		}
 		if addIdea != "" {
-			i.IdeaMetadata.RelatedIdeas = addToSlice(i.IdeaMetadata.RelatedIdeas, addIdea)
+			acore.AddRelation(&i.RelatedIdeas, addIdea)
+			acore.SyncRelation(i.Type, i.ID, addIdea)
 		}
 		if removeIdea != "" {
-			i.IdeaMetadata.RelatedIdeas = removeFromSlice(i.IdeaMetadata.RelatedIdeas, removeIdea)
+			acore.RemoveRelation(&i.RelatedIdeas, removeIdea)
+			acore.UnsyncRelation(i.Type, i.ID, removeIdea)
 		}
 
-		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
+		i.Modified = time.Now().Format(time.RFC3339)
 
-		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+		if err := denote.UpdateIdeaFrontmatter(i.FilePath, i); err != nil {
 			return fmt.Errorf("failed to update idea: %w", err)
+		}
+
+		if globalFlags.JSON {
+			reloaded, err := denote.ParseIdeaFile(i.FilePath)
+			if err != nil {
+				reloaded = i
+			}
+			data, _ := json.MarshalIndent(reloaded, "", "  ")
+			fmt.Println(string(data))
+			return nil
 		}
 
 		if !globalFlags.Quiet {
@@ -534,7 +537,7 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 				effectiveKind = denote.KindAspiration
 			}
 
-			fmt.Printf("Updated idea #%d: %q", i.IndexID, i.IdeaMetadata.Title)
+			fmt.Printf("Updated idea #%d: %q", i.IndexID, i.Title)
 			if kind != "" {
 				fmt.Printf(" [kind: %s]", kind)
 			}
@@ -548,7 +551,7 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 
 			// Encourage project link when aspiration goes active
 			if state == denote.StateActive && len(i.RelatedTasks) == 0 && effectiveKind == denote.KindAspiration {
-				fmt.Println("Hint: Consider linking an atask project with 'anote project <id> <project-denote-id>'")
+				fmt.Println("Hint: Consider linking an atask project with 'anote project <id> <project-id>'")
 			}
 		}
 
@@ -580,16 +583,16 @@ func ideaRejectCommand(cfg *config.Config) *Command {
 			return fmt.Errorf("rejection reason cannot be empty")
 		}
 
-		i.IdeaMetadata.State = denote.StateRejected
-		i.IdeaMetadata.RejectedReason = reason
-		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
+		i.State = denote.StateRejected
+		i.RejectedReason = reason
+		i.Modified = time.Now().Format(time.RFC3339)
 
-		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+		if err := denote.UpdateIdeaFrontmatter(i.FilePath, i); err != nil {
 			return fmt.Errorf("failed to reject idea: %w", err)
 		}
 
 		if !globalFlags.Quiet {
-			fmt.Printf("Rejected idea #%d: %q — %s\n", i.IndexID, i.IdeaMetadata.Title, reason)
+			fmt.Printf("Rejected idea #%d: %q — %s\n", i.IndexID, i.Title, reason)
 		}
 
 		return nil
@@ -633,25 +636,12 @@ func ideaTagCommand(cfg *config.Config) *Command {
 		if remove {
 			// Remove from frontmatter tags
 			var newTags []string
-			for _, t := range i.IdeaMetadata.Tags {
+			for _, t := range i.Tags {
 				if t != tagName {
 					newTags = append(newTags, t)
 				}
 			}
-			i.IdeaMetadata.Tags = newTags
-
-			// Remove from filename tags and rename
-			var newFileTags []string
-			for _, t := range i.File.Tags {
-				if t != tagName {
-					newFileTags = append(newFileTags, t)
-				}
-			}
-			newPath, err := denote.RenameFileForTags(i.File.Path, newFileTags)
-			if err != nil {
-				return fmt.Errorf("failed to rename file: %w", err)
-			}
-			i.File.Path = newPath
+			i.Tags = newTags
 
 			if !globalFlags.Quiet {
 				fmt.Printf("Removed tag %q from idea #%d\n", tagName, i.IndexID)
@@ -659,31 +649,14 @@ func ideaTagCommand(cfg *config.Config) *Command {
 		} else {
 			// Add to frontmatter tags (skip duplicates)
 			found := false
-			for _, t := range i.IdeaMetadata.Tags {
+			for _, t := range i.Tags {
 				if t == tagName {
 					found = true
 					break
 				}
 			}
 			if !found {
-				i.IdeaMetadata.Tags = append(i.IdeaMetadata.Tags, tagName)
-			}
-
-			// Add to filename tags (skip duplicates)
-			fileHasTag := false
-			for _, t := range i.File.Tags {
-				if t == tagName {
-					fileHasTag = true
-					break
-				}
-			}
-			if !fileHasTag {
-				newFileTags := append(i.File.Tags, tagName)
-				newPath, err := denote.RenameFileForTags(i.File.Path, newFileTags)
-				if err != nil {
-					return fmt.Errorf("failed to rename file: %w", err)
-				}
-				i.File.Path = newPath
+				i.Tags = append(i.Tags, tagName)
 			}
 
 			if !globalFlags.Quiet {
@@ -691,8 +664,8 @@ func ideaTagCommand(cfg *config.Config) *Command {
 			}
 		}
 
-		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
-		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+		i.Modified = time.Now().Format(time.RFC3339)
+		if err := denote.UpdateIdeaFrontmatter(i.FilePath, i); err != nil {
 			return fmt.Errorf("failed to update frontmatter: %w", err)
 		}
 
@@ -727,19 +700,19 @@ func ideaLinkCommand(cfg *config.Config) *Command {
 		now := time.Now().Format(time.RFC3339)
 
 		// Add idea2's ID to idea1's related ideas (skip duplicates)
-		if !containsStr(idea1.RelatedIdeas, idea2.File.ID) {
-			idea1.IdeaMetadata.RelatedIdeas = append(idea1.IdeaMetadata.RelatedIdeas, idea2.File.ID)
-			idea1.IdeaMetadata.Modified = now
-			if err := denote.UpdateFrontmatter(idea1.File.Path, &idea1.IdeaMetadata); err != nil {
+		if !containsStr(idea1.RelatedIdeas, idea2.ID) {
+			acore.AddRelation(&idea1.RelatedIdeas, idea2.ID)
+			idea1.Modified = now
+			if err := denote.UpdateIdeaFrontmatter(idea1.FilePath, idea1); err != nil {
 				return fmt.Errorf("failed to update idea #%d: %w", idea1.IndexID, err)
 			}
 		}
 
 		// Add idea1's ID to idea2's related ideas (skip duplicates)
-		if !containsStr(idea2.RelatedIdeas, idea1.File.ID) {
-			idea2.IdeaMetadata.RelatedIdeas = append(idea2.IdeaMetadata.RelatedIdeas, idea1.File.ID)
-			idea2.IdeaMetadata.Modified = now
-			if err := denote.UpdateFrontmatter(idea2.File.Path, &idea2.IdeaMetadata); err != nil {
+		if !containsStr(idea2.RelatedIdeas, idea1.ID) {
+			acore.AddRelation(&idea2.RelatedIdeas, idea1.ID)
+			idea2.Modified = now
+			if err := denote.UpdateIdeaFrontmatter(idea2.FilePath, idea2); err != nil {
 				return fmt.Errorf("failed to update idea #%d: %w", idea2.IndexID, err)
 			}
 		}
@@ -757,13 +730,13 @@ func ideaLinkCommand(cfg *config.Config) *Command {
 func ideaProjectCommand(cfg *config.Config) *Command {
 	cmd := &Command{
 		Name:        "project",
-		Usage:       "anote project <id> <project-denote-id>",
+		Usage:       "anote project <id> <project-id>",
 		Description: "Link idea to an atask project",
 	}
 
 	cmd.Run = func(c *Command, args []string) error {
 		if len(args) < 2 {
-			return fmt.Errorf("usage: anote project <id> <project-denote-id>")
+			return fmt.Errorf("usage: anote project <id> <project-id>")
 		}
 
 		i, err := lookupIdea(cfg.IdeasDirectory, args[0])
@@ -781,10 +754,10 @@ func ideaProjectCommand(cfg *config.Config) *Command {
 			return nil
 		}
 
-		i.IdeaMetadata.RelatedTasks = append(i.IdeaMetadata.RelatedTasks, projectID)
-		i.IdeaMetadata.Modified = time.Now().Format(time.RFC3339)
+		acore.AddRelation(&i.RelatedTasks, projectID)
+		i.Modified = time.Now().Format(time.RFC3339)
 
-		if err := denote.UpdateFrontmatter(i.File.Path, &i.IdeaMetadata); err != nil {
+		if err := denote.UpdateIdeaFrontmatter(i.FilePath, i); err != nil {
 			return fmt.Errorf("failed to update idea: %w", err)
 		}
 
@@ -805,27 +778,6 @@ func containsStr(slice []string, item string) bool {
 		}
 	}
 	return false
-}
-
-// addToSlice appends a value to a slice if not already present
-func addToSlice(slice []string, val string) []string {
-	for _, v := range slice {
-		if v == val {
-			return slice
-		}
-	}
-	return append(slice, val)
-}
-
-// removeFromSlice removes a value from a slice
-func removeFromSlice(slice []string, val string) []string {
-	result := make([]string, 0, len(slice))
-	for _, v := range slice {
-		if v != val {
-			result = append(result, v)
-		}
-	}
-	return result
 }
 
 // extractIdeaContent extracts the body content after YAML frontmatter.

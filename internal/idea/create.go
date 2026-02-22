@@ -3,8 +3,8 @@ package idea
 import (
 	"fmt"
 	"path/filepath"
-	"time"
 
+	"github.com/mph-llm-experiments/acore"
 	"github.com/mph-llm-experiments/anote/internal/denote"
 )
 
@@ -13,46 +13,49 @@ func CreateIdea(dir, title string, tags []string, kind string) (*denote.Idea, er
 	if kind == "" {
 		kind = denote.KindAspiration
 	}
-	counter, err := denote.GetIDCounter(dir)
+
+	counter, err := denote.NewIDCounter(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ID counter: %w", err)
 	}
 
-	indexID, err := counter.NextID()
+	indexID, err := counter.Next()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get next index ID: %w", err)
 	}
 
-	now := time.Now()
-	denoteID := now.Format("20060102T150405")
+	id := acore.NewID()
+	now := acore.Now()
 
-	slug := denote.TitleToSlug(title)
+	// Build filename: {ulid}--{slug}__idea.md
+	filename := denote.BuildIdeaFilename(id, title)
+	path := filepath.Join(dir, filename)
 
-	// Ensure "idea" tag is first in filename tags
-	filenameTags := make([]string, 0, len(tags)+1)
-	filenameTags = append(filenameTags, "idea")
+	// Ensure "idea" is in the tags array for frontmatter
+	allTags := make([]string, 0, len(tags)+1)
+	allTags = append(allTags, "idea")
 	for _, tag := range tags {
 		if tag != "idea" {
-			filenameTags = append(filenameTags, tag)
+			allTags = append(allTags, tag)
 		}
 	}
 
-	filename := denote.BuildDenoteFilename(denoteID, slug, filenameTags)
-	path := filepath.Join(dir, filename)
+	idea := &denote.Idea{}
+	idea.ID = id
+	idea.Title = title
+	idea.IndexID = indexID
+	idea.Type = denote.TypeIdea
+	idea.Tags = allTags
+	idea.Created = now
+	idea.Modified = now
+	idea.Kind = kind
+	idea.State = denote.StateSeed
+	idea.FilePath = path
 
-	meta := &denote.IdeaMetadata{
-		Title:   title,
-		IndexID: indexID,
-		Type:    denote.TypeIdea,
-		Kind:    kind,
-		State:   denote.StateSeed,
-		Tags:    tags,
-		Created: now.Format(time.RFC3339),
-	}
-
-	if err := denote.WriteIdeaFile(path, meta, ""); err != nil {
+	if err := denote.WriteIdeaFile(path, idea, ""); err != nil {
 		return nil, fmt.Errorf("failed to write idea file: %w", err)
 	}
 
+	// Parse back to get consistent state (ModTime, etc.)
 	return denote.ParseIdeaFile(path)
 }
