@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -45,7 +46,7 @@ func ideaNewCommand(cfg *config.Config) *Command {
 		}
 
 		if kind != "" && !denote.IsValidKind(kind) {
-			return fmt.Errorf("invalid kind %q: use aspiration or belief", kind)
+			return fmt.Errorf("invalid kind %q: use aspiration, belief, or plan", kind)
 		}
 
 		title := strings.Join(titleParts, " ")
@@ -87,11 +88,12 @@ func ideaListCommand(cfg *config.Config) *Command {
 		maturity   string
 		tag        string
 		kindFilter string
+		plannedFor string
 	)
 
 	cmd := &Command{
 		Name:        "list",
-		Usage:       "anote list [--state STATE] [--maturity LEVEL] [--kind KIND] [--tag TAG] [-a]",
+		Usage:       "anote list [--state STATE] [--maturity LEVEL] [--kind KIND] [--tag TAG] [--planned-for DATE] [-a]",
 		Description: "List ideas",
 		Flags:       flag.NewFlagSet("list", flag.ContinueOnError),
 	}
@@ -101,7 +103,8 @@ func ideaListCommand(cfg *config.Config) *Command {
 	cmd.Flags.StringVar(&state, "state", "", "Filter by state (accepts display labels like considering)")
 	cmd.Flags.StringVar(&maturity, "maturity", "", "Filter by maturity")
 	cmd.Flags.StringVar(&tag, "tag", "", "Filter by tag")
-	cmd.Flags.StringVar(&kindFilter, "kind", "", "Filter by kind (aspiration or belief)")
+	cmd.Flags.StringVar(&kindFilter, "kind", "", "Filter by kind (aspiration, belief, or plan)")
+	cmd.Flags.StringVar(&plannedFor, "planned-for", "", "Filter by planned_for date (today, YYYY-MM-DD, or any)")
 
 	cmd.Run = func(c *Command, args []string) error {
 		scanner := denote.NewScanner(cfg.IdeasDirectory)
@@ -168,6 +171,23 @@ func ideaListCommand(cfg *config.Config) *Command {
 				}
 			}
 
+			if plannedFor != "" {
+				switch strings.ToLower(plannedFor) {
+				case "any":
+					if i.PlannedFor == "" {
+						continue
+					}
+				case "today":
+					if i.PlannedFor != time.Now().Format("2006-01-02") {
+						continue
+					}
+				default:
+					if i.PlannedFor != plannedFor {
+						continue
+					}
+				}
+			}
+
 			filtered = append(filtered, i)
 		}
 
@@ -215,8 +235,11 @@ func ideaListCommand(cfg *config.Config) *Command {
 			displayState := denote.DisplayState(i.State, effectiveKind)
 
 			kindShort := "A"
-			if effectiveKind == denote.KindBelief {
+			switch effectiveKind {
+			case denote.KindBelief:
 				kindShort = "B"
+			case denote.KindPlan:
+				kindShort = "P"
 			}
 
 			mat := i.Maturity
@@ -319,6 +342,9 @@ func ideaShowCommand(cfg *config.Config) *Command {
 		if i.Modified != "" {
 			fmt.Printf("Modified:   %s\n", i.Modified)
 		}
+		if i.PlannedFor != "" {
+			fmt.Printf("Planned:    %s\n", i.PlannedFor)
+		}
 		if i.RejectedReason != "" {
 			fmt.Printf("Rejected:   %s\n", i.RejectedReason)
 		}
@@ -375,19 +401,24 @@ func ideaShowCommand(cfg *config.Config) *Command {
 func ideaUpdateCommand(cfg *config.Config) *Command {
 	cmd := &Command{
 		Name:        "update",
-		Usage:       "anote update <id> [--title TITLE] [--state STATE] [--maturity LEVEL] [--kind KIND]",
+		Usage:       "anote update <id> [--title TITLE] [--state STATE] [--maturity LEVEL] [--kind KIND] [--plan-for DATE]",
 		Description: "Update idea title, state, maturity, or kind",
 	}
 
 	cmd.Run = func(c *Command, args []string) error {
 		// Manual flag parsing to allow: update <id> --state X or update --state X <id>
-		var state, maturity, kind, title, idRef string
+		var state, maturity, kind, title, body, idRef, planFor string
 		var addPerson, removePerson, addTask, removeTask, addIdea, removeIdea string
 		for idx := 0; idx < len(args); idx++ {
 			switch args[idx] {
 			case "--title":
 				if idx+1 < len(args) {
 					title = args[idx+1]
+					idx++
+				}
+			case "--body":
+				if idx+1 < len(args) {
+					body = args[idx+1]
 					idx++
 				}
 			case "--state":
@@ -403,6 +434,11 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			case "--kind":
 				if idx+1 < len(args) {
 					kind = args[idx+1]
+					idx++
+				}
+			case "--plan-for":
+				if idx+1 < len(args) {
+					planFor = args[idx+1]
 					idx++
 				}
 			case "--add-person":
@@ -447,8 +483,8 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 		}
 
 		hasRelationUpdate := addPerson != "" || removePerson != "" || addTask != "" || removeTask != "" || addIdea != "" || removeIdea != ""
-		if state == "" && maturity == "" && kind == "" && title == "" && !hasRelationUpdate {
-			return fmt.Errorf("nothing to update: provide --title, --state, --maturity, --kind, or relationship flags")
+		if state == "" && maturity == "" && kind == "" && title == "" && body == "" && planFor == "" && !hasRelationUpdate {
+			return fmt.Errorf("nothing to update: provide --title, --body, --state, --maturity, --kind, --plan-for, or relationship flags")
 		}
 
 		i, err := lookupIdea(cfg.IdeasDirectory, idRef)
@@ -476,7 +512,7 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 		// Validate and set kind
 		if kind != "" {
 			if !denote.IsValidKind(kind) {
-				return fmt.Errorf("invalid kind %q: use aspiration or belief", kind)
+				return fmt.Errorf("invalid kind %q: use aspiration, belief, or plan", kind)
 			}
 			i.Kind = kind
 		}
@@ -487,6 +523,19 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 				return fmt.Errorf("invalid maturity %q: use crawl, walk, or run", maturity)
 			}
 			i.Maturity = maturity
+		}
+
+		// Resolve and set planned_for
+		if planFor != "" {
+			if strings.ToLower(planFor) == "none" {
+				i.PlannedFor = ""
+			} else {
+				parsed, err := acore.ParseNaturalDate(planFor)
+				if err != nil {
+					return fmt.Errorf("invalid --plan-for date: %v", err)
+				}
+				i.PlannedFor = parsed
+			}
 		}
 
 		// Apply cross-app relationship updates
@@ -517,8 +566,17 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 
 		i.Modified = time.Now().Format(time.RFC3339)
 
-		if err := denote.UpdateIdeaFrontmatter(i.FilePath, i); err != nil {
-			return fmt.Errorf("failed to update idea: %w", err)
+		if body != "" {
+			// Replace description (content before ## Log section), preserve log
+			existingContent := extractIdeaContent(i.Content)
+			newContent := replaceDescription(existingContent, body)
+			if err := denote.WriteIdeaFile(i.FilePath, i, newContent); err != nil {
+				return fmt.Errorf("failed to update idea: %w", err)
+			}
+		} else {
+			if err := denote.UpdateIdeaFrontmatter(i.FilePath, i); err != nil {
+				return fmt.Errorf("failed to update idea: %w", err)
+			}
 		}
 
 		if globalFlags.JSON {
@@ -555,6 +613,65 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			}
 		}
 
+		return nil
+	}
+
+	return cmd
+}
+
+func ideaDeleteCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "delete",
+		Usage:       "anote delete <id> [--confirm]",
+		Description: "Delete an idea file",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		if len(args) == 0 {
+			return fmt.Errorf("usage: anote delete <id> [--confirm]")
+		}
+
+		confirm := false
+		idRef := ""
+		for _, arg := range args {
+			if arg == "--confirm" {
+				confirm = true
+			} else if idRef == "" {
+				idRef = arg
+			}
+		}
+		if idRef == "" {
+			return fmt.Errorf("usage: anote delete <id> [--confirm]")
+		}
+
+		i, err := lookupIdea(cfg.IdeasDirectory, idRef)
+		if err != nil {
+			return err
+		}
+
+		if !confirm {
+			return fmt.Errorf("use --confirm to delete idea '%s' (%s)", i.Title, i.FilePath)
+		}
+
+		if err := os.Remove(i.FilePath); err != nil {
+			return fmt.Errorf("failed to delete idea: %w", err)
+		}
+
+		if globalFlags.JSON {
+			result := map[string]interface{}{
+				"deleted":  true,
+				"index_id": i.IndexID,
+				"title":    i.Title,
+				"file":     i.FilePath,
+			}
+			data, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Println(string(data))
+			return nil
+		}
+
+		if !globalFlags.Quiet {
+			fmt.Printf("Deleted idea #%d: %s\n", i.IndexID, i.Title)
+		}
 		return nil
 	}
 
@@ -778,6 +895,86 @@ func containsStr(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func ideaLogCommand(cfg *config.Config) *Command {
+	cmd := &Command{
+		Name:        "log",
+		Usage:       "anote log <id> \"message\"",
+		Description: "Add a timestamped log entry to an idea",
+	}
+
+	cmd.Run = func(c *Command, args []string) error {
+		if len(args) < 2 {
+			return fmt.Errorf("usage: anote log <id> \"message\"")
+		}
+
+		idRef := args[0]
+		message := strings.Join(args[1:], " ")
+
+		i, err := lookupIdea(cfg.IdeasDirectory, idRef)
+		if err != nil {
+			return err
+		}
+
+		existingContent := extractIdeaContent(i.Content)
+		newContent := addLogEntry(existingContent, message)
+
+		i.Modified = time.Now().Format(time.RFC3339)
+		if err := denote.WriteIdeaFile(i.FilePath, i, newContent); err != nil {
+			return fmt.Errorf("failed to write idea: %w", err)
+		}
+
+		if !globalFlags.Quiet {
+			fmt.Printf("Logged to idea #%d: %s\n", i.IndexID, i.Title)
+		}
+
+		return nil
+	}
+
+	return cmd
+}
+
+// replaceDescription replaces the description portion of content (before ## Log),
+// preserving the log section.
+func replaceDescription(content, newDesc string) string {
+	logIdx := strings.Index(content, "\n## Log\n")
+	if logIdx == -1 {
+		logIdx = strings.Index(content, "## Log\n")
+		if logIdx == 0 {
+			// Content starts with ## Log, prepend description
+			return newDesc + "\n\n" + content
+		}
+		// No log section, just replace everything
+		return newDesc + "\n"
+	}
+	return newDesc + "\n" + content[logIdx:]
+}
+
+// addLogEntry appends a timestamped entry to the ## Log section.
+func addLogEntry(content, message string) string {
+	now := time.Now().Format("2006-01-02")
+	entry := fmt.Sprintf("- **%s** %s", now, message)
+
+	logIdx := strings.Index(content, "\n## Log\n")
+	if logIdx != -1 {
+		// Insert after the ## Log header
+		insertAt := logIdx + len("\n## Log\n")
+		return content[:insertAt] + entry + "\n" + content[insertAt:]
+	}
+
+	// Check if content starts with ## Log
+	if strings.HasPrefix(content, "## Log\n") {
+		insertAt := len("## Log\n")
+		return content[:insertAt] + entry + "\n" + content[insertAt:]
+	}
+
+	// No log section yet, append one
+	trimmed := strings.TrimRight(content, "\n")
+	if trimmed == "" {
+		return "## Log\n" + entry + "\n"
+	}
+	return trimmed + "\n\n## Log\n" + entry + "\n"
 }
 
 // extractIdeaContent extracts the body content after YAML frontmatter.

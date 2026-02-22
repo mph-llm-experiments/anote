@@ -31,6 +31,7 @@ const (
 const (
 	KindAspiration = "aspiration"
 	KindBelief     = "belief"
+	KindPlan       = "plan"
 )
 
 // Type constant.
@@ -110,7 +111,7 @@ func ValidateStateTransition(from, to string) error {
 // IsValidKind checks if a kind value is valid.
 func IsValidKind(kind string) bool {
 	switch kind {
-	case KindAspiration, KindBelief:
+	case KindAspiration, KindBelief, KindPlan:
 		return true
 	}
 	return false
@@ -123,6 +124,11 @@ var displayLabels = map[string]map[string]string{
 		StateActive:      "considering",
 		StateIterating:   "reconsidering",
 		StateImplemented: "accepted",
+	},
+	KindPlan: {
+		StateActive:      "committed",
+		StateIterating:   "replanning",
+		StateImplemented: "completed",
 	},
 }
 
@@ -143,9 +149,11 @@ func ResolveDisplayState(display string) (canonical string, matchedKind string) 
 	if IsValidState(display) {
 		return display, ""
 	}
-	for canonical, label := range displayLabels[KindBelief] {
-		if label == display {
-			return canonical, KindBelief
+	for kind, kindMap := range displayLabels {
+		for canonical, label := range kindMap {
+			if label == display {
+				return canonical, kind
+			}
 		}
 	}
 	return display, ""
@@ -158,7 +166,7 @@ func ValidateIdea(idea *Idea) error {
 	}
 
 	if idea.Kind != "" && !IsValidKind(idea.Kind) {
-		return fmt.Errorf("invalid kind: %s (use aspiration or belief)", idea.Kind)
+		return fmt.Errorf("invalid kind: %s (use aspiration, belief, or plan)", idea.Kind)
 	}
 
 	if idea.Maturity != "" && !IsValidMaturity(idea.Maturity) {

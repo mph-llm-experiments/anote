@@ -56,6 +56,21 @@ Display labels differ by kind: aspirations use active/iterating/implemented; bel
 ## Maturity Values (Orthogonal)
 `crawl` → `walk` → `run`
 
+## Organization Idea Pipeline
+Ideas tagged `organization` represent the architectural vision and backlog for the asystem ecosystem. When working on anote features, design decisions, or anything beyond a simple bug fix, check these ideas for context:
+
+```bash
+anote list --tag organization
+anote show <id>
+```
+
+These ideas capture system-level thinking — how anote fits with atask/apeople/aweb, what the long-term architecture looks like, and what Mike is trying to build. Use them to:
+- **Ground feature work** in existing design intentions rather than inventing in a vacuum
+- **Identify when a change touches a bigger idea** and flag it to the human
+- **Spot connections** between the current task and ideas that might be ready to advance in maturity
+
+Do NOT auto-advance idea state or maturity. Surface the connection and let the human decide.
+
 ## Development Protocols
 
 ### Context Protection

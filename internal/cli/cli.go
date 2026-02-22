@@ -37,6 +37,7 @@ Commands:
   list       List ideas
   show       Show idea details
   update     Update idea state or maturity
+  delete     Delete an idea file
   reject     Reject an idea (with reason)
   tag        Add or remove tags
   link       Link related ideas
@@ -54,6 +55,8 @@ Global Options:
 		ideaListCommand(cfg),
 		ideaShowCommand(cfg),
 		ideaUpdateCommand(cfg),
+		ideaLogCommand(cfg),
+		ideaDeleteCommand(cfg),
 		ideaRejectCommand(cfg),
 		ideaTagCommand(cfg),
 		ideaLinkCommand(cfg),
