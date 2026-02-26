@@ -130,6 +130,18 @@ Kind determines **what type of idea** this is. The same state machine applies to
 |------|-------------|
 | `aspiration` | Something to build, ship, or do (default) |
 | `belief` | Something held as true — a conviction, principle, or mental model |
+| `plan` | A concrete plan with a timeframe |
+| `note` | A piece of information — variable confidence, consult but verify |
+| `fact` | A high-confidence ground truth — treat as authoritative |
+
+### Simple Kinds (note, fact)
+
+Notes and facts are **simple kinds** — they exist as reference material and skip the full lifecycle:
+
+- **States:** Only `active` and `archived`. Default to `active` on creation (not `seed`).
+- **Maturity:** Not applicable. `--maturity` is rejected for simple kinds.
+- **Reject:** Not supported. Use `--state archived` instead.
+- **Trust levels:** Facts are ground truth (assert directly). Notes are advisory (verify before asserting).
 
 ### Display Label Mapping
 

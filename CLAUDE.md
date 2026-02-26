@@ -46,9 +46,11 @@ anote/
 ```
 
 ## Kind Values
-`aspiration` (default) | `belief`
+`aspiration` (default) | `belief` | `plan` | `note` | `fact`
 
-Display labels differ by kind: aspirations use active/iterating/implemented; beliefs use considering/reconsidering/accepted. Canonical state stored in YAML regardless.
+Display labels differ by kind: aspirations use active/iterating/implemented; beliefs use considering/reconsidering/accepted; plans use committed/replanning/completed. Canonical state stored in YAML regardless.
+
+**Simple kinds:** `note` and `fact` skip the full lifecycle. They only support `active` and `archived` states, default to `active` on creation (not `seed`), and do not use maturity. The `reject` command is not supported for simple kinds.
 
 ## State Values
 `seed` → `draft` → `active` ↔ `iterating` → `implemented` | `archived` | `rejected` | `dropped`

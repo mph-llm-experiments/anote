@@ -49,7 +49,11 @@ func CreateIdea(dir, title string, tags []string, kind string) (*denote.Idea, er
 	idea.Created = now
 	idea.Modified = now
 	idea.Kind = kind
-	idea.State = denote.StateSeed
+	if denote.IsSimpleKind(kind) {
+		idea.State = denote.StateActive
+	} else {
+		idea.State = denote.StateSeed
+	}
 	idea.FilePath = path
 
 	if err := denote.WriteIdeaFile(path, idea, ""); err != nil {

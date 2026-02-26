@@ -32,6 +32,8 @@ const (
 	KindAspiration = "aspiration"
 	KindBelief     = "belief"
 	KindPlan       = "plan"
+	KindNote       = "note"
+	KindFact       = "fact"
 )
 
 // Type constant.
@@ -111,10 +113,16 @@ func ValidateStateTransition(from, to string) error {
 // IsValidKind checks if a kind value is valid.
 func IsValidKind(kind string) bool {
 	switch kind {
-	case KindAspiration, KindBelief, KindPlan:
+	case KindAspiration, KindBelief, KindPlan, KindNote, KindFact:
 		return true
 	}
 	return false
+}
+
+// IsSimpleKind returns true for kinds that skip the full lifecycle (note, fact).
+// Simple kinds only support active and archived states, and do not use maturity.
+func IsSimpleKind(kind string) bool {
+	return kind == KindNote || kind == KindFact
 }
 
 // displayLabels maps canonical states to kind-specific display labels.
@@ -166,7 +174,7 @@ func ValidateIdea(idea *Idea) error {
 	}
 
 	if idea.Kind != "" && !IsValidKind(idea.Kind) {
-		return fmt.Errorf("invalid kind: %s (use aspiration, belief, or plan)", idea.Kind)
+		return fmt.Errorf("invalid kind: %s (use aspiration, belief, plan, note, or fact)", idea.Kind)
 	}
 
 	if idea.Maturity != "" && !IsValidMaturity(idea.Maturity) {

@@ -46,7 +46,7 @@ func ideaNewCommand(cfg *config.Config) *Command {
 		}
 
 		if kind != "" && !denote.IsValidKind(kind) {
-			return fmt.Errorf("invalid kind %q: use aspiration, belief, or plan", kind)
+			return fmt.Errorf("invalid kind %q: use aspiration, belief, plan, note, or fact", kind)
 		}
 
 		title := strings.Join(titleParts, " ")
@@ -103,7 +103,7 @@ func ideaListCommand(cfg *config.Config) *Command {
 	cmd.Flags.StringVar(&state, "state", "", "Filter by state (accepts display labels like considering)")
 	cmd.Flags.StringVar(&maturity, "maturity", "", "Filter by maturity")
 	cmd.Flags.StringVar(&tag, "tag", "", "Filter by tag")
-	cmd.Flags.StringVar(&kindFilter, "kind", "", "Filter by kind (aspiration, belief, or plan)")
+	cmd.Flags.StringVar(&kindFilter, "kind", "", "Filter by kind (aspiration, belief, plan, note, or fact)")
 	cmd.Flags.StringVar(&plannedFor, "planned-for", "", "Filter by planned_for date (today, YYYY-MM-DD, or any)")
 
 	cmd.Run = func(c *Command, args []string) error {
@@ -158,17 +158,8 @@ func ideaListCommand(cfg *config.Config) *Command {
 				continue
 			}
 
-			if tag != "" {
-				found := false
-				for _, t := range i.Tags {
-					if t == tag {
-						found = true
-						break
-					}
-				}
-				if !found {
-					continue
-				}
+			if tag != "" && !i.HasTag(tag) {
+				continue
 			}
 
 			if plannedFor != "" {
@@ -240,10 +231,17 @@ func ideaListCommand(cfg *config.Config) *Command {
 				kindShort = "B"
 			case denote.KindPlan:
 				kindShort = "P"
+			case denote.KindNote:
+				kindShort = "N"
+			case denote.KindFact:
+				kindShort = "F"
 			}
 
 			mat := i.Maturity
 			if mat == "" {
+				mat = "-"
+			}
+			if denote.IsSimpleKind(effectiveKind) {
 				mat = "-"
 			}
 
@@ -496,6 +494,15 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			i.Title = title
 		}
 
+		// Determine effective kind (consider --kind flag if provided)
+		effectiveKind := i.Kind
+		if kind != "" {
+			effectiveKind = kind
+		}
+		if effectiveKind == "" {
+			effectiveKind = denote.KindAspiration
+		}
+
 		// Resolve display label to canonical state
 		if state != "" {
 			resolved, _ := denote.ResolveDisplayState(state)
@@ -506,19 +513,25 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 			if !denote.IsValidState(state) {
 				return fmt.Errorf("invalid state %q", state)
 			}
+			if denote.IsSimpleKind(effectiveKind) && state != denote.StateActive && state != denote.StateArchived {
+				return fmt.Errorf("note and fact kinds only support active and archived states")
+			}
 			i.State = state
 		}
 
 		// Validate and set kind
 		if kind != "" {
 			if !denote.IsValidKind(kind) {
-				return fmt.Errorf("invalid kind %q: use aspiration, belief, or plan", kind)
+				return fmt.Errorf("invalid kind %q: use aspiration, belief, plan, note, or fact", kind)
 			}
 			i.Kind = kind
 		}
 
 		// Validate and set maturity
 		if maturity != "" {
+			if denote.IsSimpleKind(effectiveKind) {
+				return fmt.Errorf("note and fact kinds do not use maturity")
+			}
 			if !denote.IsValidMaturity(maturity) {
 				return fmt.Errorf("invalid maturity %q: use crawl, walk, or run", maturity)
 			}
@@ -590,11 +603,6 @@ func ideaUpdateCommand(cfg *config.Config) *Command {
 		}
 
 		if !globalFlags.Quiet {
-			effectiveKind := i.Kind
-			if effectiveKind == "" {
-				effectiveKind = denote.KindAspiration
-			}
-
 			fmt.Printf("Updated idea #%d: %q", i.IndexID, i.Title)
 			if kind != "" {
 				fmt.Printf(" [kind: %s]", kind)
@@ -693,6 +701,14 @@ func ideaRejectCommand(cfg *config.Config) *Command {
 		i, err := lookupIdea(cfg.IdeasDirectory, args[0])
 		if err != nil {
 			return err
+		}
+
+		effectiveKind := i.Kind
+		if effectiveKind == "" {
+			effectiveKind = denote.KindAspiration
+		}
+		if denote.IsSimpleKind(effectiveKind) {
+			return fmt.Errorf("note and fact kinds cannot be rejected; use 'anote update %s --state archived' instead", args[0])
 		}
 
 		reason := strings.Join(args[1:], " ")
