@@ -20,7 +20,7 @@ import (
 func ideaNewCommand(cfg *config.Config) *Command {
 	cmd := &Command{
 		Name:        "new",
-		Usage:       "anote new [--tag TAG]... [--kind KIND] <title>",
+		Usage:       "anote new [--tag TAG]... [--kind KIND] [--body BODY] <title>",
 		Description: "Create a new idea",
 	}
 
@@ -28,13 +28,16 @@ func ideaNewCommand(cfg *config.Config) *Command {
 		// Manual flag parsing to allow: new "title" --tag X or new --tag X "title"
 		var tags []string
 		var titleParts []string
-		var kind string
+		var kind, body string
 		for idx := 0; idx < len(args); idx++ {
 			if args[idx] == "--tag" && idx+1 < len(args) {
 				tags = append(tags, strings.TrimSpace(args[idx+1]))
 				idx++
 			} else if args[idx] == "--kind" && idx+1 < len(args) {
 				kind = strings.TrimSpace(args[idx+1])
+				idx++
+			} else if args[idx] == "--body" && idx+1 < len(args) {
+				body = args[idx+1]
 				idx++
 			} else if !strings.HasPrefix(args[idx], "-") {
 				titleParts = append(titleParts, args[idx])
@@ -51,7 +54,7 @@ func ideaNewCommand(cfg *config.Config) *Command {
 
 		title := strings.Join(titleParts, " ")
 
-		created, err := idea.CreateIdea(cfg.IdeasDirectory, title, tags, kind)
+		created, err := idea.CreateIdea(cfg.IdeasDirectory, title, tags, kind, body)
 		if err != nil {
 			return err
 		}

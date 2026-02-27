@@ -9,7 +9,7 @@ import (
 )
 
 // CreateIdea creates a new idea file with YAML frontmatter.
-func CreateIdea(dir, title string, tags []string, kind string) (*denote.Idea, error) {
+func CreateIdea(dir, title string, tags []string, kind string, body string) (*denote.Idea, error) {
 	if kind == "" {
 		kind = denote.KindAspiration
 	}
@@ -56,7 +56,11 @@ func CreateIdea(dir, title string, tags []string, kind string) (*denote.Idea, er
 	}
 	idea.FilePath = path
 
-	if err := denote.WriteIdeaFile(path, idea, ""); err != nil {
+	content := ""
+	if body != "" {
+		content = body + "\n"
+	}
+	if err := denote.WriteIdeaFile(path, idea, content); err != nil {
 		return nil, fmt.Errorf("failed to write idea file: %w", err)
 	}
 
