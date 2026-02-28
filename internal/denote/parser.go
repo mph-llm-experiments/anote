@@ -17,7 +17,9 @@ var (
 // ParseIdeaFile reads and parses an idea file using acore.
 func ParseIdeaFile(path string) (*Idea, error) {
 	var idea Idea
-	content, err := acore.ReadFile(path, &idea)
+	store := acore.NewLocalStore(filepath.Dir(path))
+	name := filepath.Base(path)
+	content, err := acore.ReadFile(store, name, &idea)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse idea file: %w", err)
 	}

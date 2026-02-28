@@ -1,6 +1,8 @@
 package denote
 
 import (
+	"path/filepath"
+
 	"github.com/mph-llm-experiments/acore"
 )
 
@@ -16,15 +18,15 @@ func NewScanner(dir string) *Scanner {
 
 // FindIdeas finds and parses all idea files in the directory.
 func (s *Scanner) FindIdeas() ([]*Idea, error) {
-	sc := &acore.Scanner{Dir: s.BaseDir}
-	paths, err := sc.FindByType(TypeIdea)
+	sc := &acore.Scanner{Store: acore.NewLocalStore(s.BaseDir)}
+	names, err := sc.FindByType(TypeIdea)
 	if err != nil {
 		return nil, err
 	}
 
 	var ideas []*Idea
-	for _, path := range paths {
-		idea, err := ParseIdeaFile(path)
+	for _, name := range names {
+		idea, err := ParseIdeaFile(filepath.Join(s.BaseDir, name))
 		if err != nil {
 			continue
 		}

@@ -21,6 +21,8 @@ All data is stored as plain markdown files with YAML frontmatter. Filename forma
 - `note`: A piece of information — variable confidence, consult but verify
 - `fact`: A high-confidence ground truth — treat as authoritative
 
+**IMPORTANT:** `idea` is NOT a valid kind. Everything in anote is an idea — `kind` specifies *what type* of idea. To create a default idea, omit `--kind` (defaults to `aspiration`). Never pass `--kind idea`.
+
 ### State
 
 Progression: `seed` -> `draft` -> `active` <-> `iterating` -> terminal
