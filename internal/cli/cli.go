@@ -27,6 +27,12 @@ func Run(cfg *config.Config, args []string) error {
 		cfg.IdeasDirectory = globalFlags.Dir
 	}
 
+	// Sync on startup/shutdown — skip for --json (programmatic/aweb use)
+	if !globalFlags.JSON {
+		SyncOnStartup(cfg)
+		defer SyncOnShutdown(cfg)
+	}
+
 	root := &Command{
 		Name:  "anote",
 		Usage: "anote <command> [options]",
@@ -41,6 +47,7 @@ Commands:
   reject     Reject an idea (with reason)
   tag        Add or remove tags
   link       Link related ideas
+  sync       Sync files with Cloudflare R2
 
 Global Options:
   --config PATH  Use specific config file
@@ -61,6 +68,7 @@ Global Options:
 		ideaTagCommand(cfg),
 		ideaLinkCommand(cfg),
 		ideaProjectCommand(cfg),
+		syncCommand(cfg),
 		ideaMigrateCommand(cfg),
 	)
 

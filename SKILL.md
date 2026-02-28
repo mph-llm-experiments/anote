@@ -259,6 +259,20 @@ atask update <task-index-id> --add-idea <idea-ulid>
 apeople update <contact-index-id> --add-idea <idea-ulid>
 ```
 
+## Sync (R2 Cloud Storage)
+
+Sync idea files to/from Cloudflare R2. Requires `[r2]` section in config.toml.
+
+```bash
+anote sync            # Push local → R2 (default)
+anote sync --push     # Push local → R2
+anote sync --pull     # Pull R2 → local
+```
+
+Push uploads new/changed local files to R2 and deletes R2-only files. Pull does the reverse. Only `*.md` entity files are synced (not counter files or config).
+
+Automatic sync happens at CLI startup (pull) and shutdown (push) when R2 is configured, but only for interactive use — skipped when `--json` is set. Automatic sync never deletes files; only explicit `sync --push`/`--pull` can delete.
+
 ## Configuration
 
 Config: `~/.config/acore/config.toml`
