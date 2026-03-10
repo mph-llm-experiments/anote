@@ -11,7 +11,7 @@ import (
 // View implements tea.Model by dispatching to the appropriate renderer.
 func (m Model) View() string {
 	switch m.mode {
-	case ModeIdeaView, ModeStateMenu, ModeTagsEdit, ModeLogEntry, ModeCompliancePrompt:
+	case ModeIdeaView, ModeStateMenu, ModeTagsEdit, ModeLogEntry, ModeCompliancePrompt, ModeConfirmDelete:
 		return m.viewIdeaDetail()
 	case ModeHelp:
 		return m.viewHelp()
@@ -108,7 +108,7 @@ func (m Model) activeFilterSummary() string {
 }
 
 func (m Model) renderFooter() string {
-	hints := "c:new  /:search  enter:open  K:kind  P:purpose  F:filter  S:sort  ?:help  q:quit"
+	hints := "c:new  /:search  enter:open  K:kind  P:purpose  ?:help  q:quit"
 	if m.statusMsg != "" {
 		hints = m.statusMsg
 	}
@@ -123,8 +123,6 @@ func (m Model) viewHelp() string {
 		{Key: "enter", Desc: "open idea"},
 		{Key: "c", Desc: "create new idea"},
 		{Key: "/", Desc: "search by title"},
-		{Key: "F", Desc: "filter menu"},
-		{Key: "S", Desc: "sort menu"},
 		{Key: "K", Desc: "filter by kind (list) / change kind (idea view)"},
 		{Key: "P", Desc: "filter by purpose"},
 		{Key: "?", Desc: "this help"},

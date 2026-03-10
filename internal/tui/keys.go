@@ -16,6 +16,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg.String())
+	case editorReturnMsg:
+		// Editor exited — refresh viewing idea and reload list so content is current.
+		if m.viewingIdea != nil {
+			if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+				m.viewingIdea = fresh
+			}
+			_ = m.loadIdeas()
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -291,12 +300,16 @@ func (m Model) handleCreateKey(key string) (tea.Model, tea.Cmd) {
 			created, err := createIdea(m.cfg, m.createTitle, m.createKind, tags)
 			if err != nil {
 				m.statusMsg = "error creating idea: " + err.Error()
-			} else {
-				m.statusMsg = "Created: " + created.Title
-				_ = m.loadIdeas()
+				m.mode = ModeNormal
+				m.editBuf.Clear()
+				return m, nil
 			}
-			m.mode = ModeNormal
+			_ = m.loadIdeas()
+			m.viewingIdea = created
+			m.mode = ModeIdeaView
 			m.editBuf.Clear()
+			// Open in editor so user can write the body immediately.
+			return m, openInEditor(created.FilePath)
 		}
 	case "tab":
 		// Cycle through available kinds when on kind field
@@ -410,12 +423,18 @@ func (m Model) handleConfirmDeleteKey(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// editorReturnMsg is sent after $EDITOR exits.
+type editorReturnMsg struct{}
+
 // openInEditor opens the file at path in $EDITOR, suspending the TUI.
+// Sends editorReturnMsg when the editor exits so the model can refresh.
 func openInEditor(filePath string) tea.Cmd {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
 		editor = "vi"
 	}
 	c := exec.Command(editor, filePath)
-	return tea.ExecProcess(c, nil)
+	return tea.ExecProcess(c, func(_ error) tea.Msg {
+		return editorReturnMsg{}
+	})
 }
