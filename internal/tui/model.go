@@ -161,7 +161,3 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View implements tea.Model — stubbed here, filled in by views.go.
-func (m Model) View() string {
-	return "anote (loading...)"
-}
