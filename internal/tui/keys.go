@@ -337,12 +337,3 @@ func openInEditor(filePath string) tea.Cmd {
 	return tea.ExecProcess(c, nil)
 }
 
-// handleIdeaViewKey is implemented in idea_view_keys.go (Task 9).
-// Stub to allow compilation.
-func (m Model) handleIdeaViewKey(key string) (tea.Model, tea.Cmd) {
-	if key == "q" || key == "esc" {
-		m.mode = ModeNormal
-		m.viewingIdea = nil
-	}
-	return m, nil
-}

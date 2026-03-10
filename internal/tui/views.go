@@ -6,7 +6,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	acoreui "github.com/mph-llm-experiments/acore/tui"
-	"github.com/mph-llm-experiments/anote/internal/denote"
 )
 
 // View implements tea.Model by dispatching to the appropriate renderer.
@@ -144,18 +143,3 @@ func (m Model) viewHelp() string {
 	return acoreui.RenderHelp(bindings, m.width)
 }
 
-// viewIdeaDetail and viewCreate are stubs — filled in by later tasks.
-func (m Model) viewIdeaDetail() string {
-	if m.viewingIdea == nil {
-		return "No idea selected\n\nq: back"
-	}
-	return fmt.Sprintf("%s\n\nkind: %s  state: %s\n\ns:state  p:purpose  q:back",
-		acoreui.SelectedStyle.Render(m.viewingIdea.Title),
-		m.viewingIdea.Kind,
-		denote.DisplayState(m.viewingIdea.State, m.viewingIdea.Kind),
-	)
-}
-
-func (m Model) viewCreate() string {
-	return "New idea\n\nTitle: " + m.editBuf.Render() + "\n\nenter: save  esc: cancel"
-}
