@@ -11,7 +11,7 @@ import (
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.handleWindowSize(msg)
+		m = handleWindowSize(m, msg)
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg.String())
@@ -29,7 +29,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 		return m.handleMenuKey(key)
 	case ModeCompliancePrompt:
 		return m.handleComplianceKey(key)
-	case ModeCreate, ModeCreateTags:
+	case ModeCreate:
 		return m.handleCreateKey(key)
 	case ModeLogEntry:
 		return m.handleLogEntryKey(key)

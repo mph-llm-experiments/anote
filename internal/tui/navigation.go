@@ -16,7 +16,8 @@ func (m *Model) handleNavKey(key string) bool {
 }
 
 // handleWindowSize handles terminal resize events.
-func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) {
+func handleWindowSize(m Model, msg tea.WindowSizeMsg) Model {
 	m.width = msg.Width
 	m.height = msg.Height
+	return m
 }
