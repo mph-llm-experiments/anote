@@ -36,6 +36,8 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 		return m.handleLogEntryKey(key)
 	case ModeTagsEdit:
 		return m.handleTagsEditKey(key)
+	case ModeConfirmDelete:
+		return m.handleConfirmDeleteKey(key)
 	case ModeHelp:
 		m.mode = ModeNormal
 		return m, nil
@@ -384,6 +386,26 @@ func (m Model) handleTagsEditKey(key string) (tea.Model, tea.Cmd) {
 		if len(key) == 1 {
 			m.editBuf.Insert(rune(key[0]))
 		}
+	}
+	return m, nil
+}
+
+func (m Model) handleConfirmDeleteKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "y":
+		if m.viewingIdea != nil {
+			if err := deleteIdea(m.viewingIdea); err != nil {
+				m.statusMsg = "error deleting: " + err.Error()
+				m.mode = ModeIdeaView
+			} else {
+				m.statusMsg = "Deleted: " + m.viewingIdea.Title
+				m.viewingIdea = nil
+				m.mode = ModeNormal
+				_ = m.loadIdeas()
+			}
+		}
+	case "n", "esc", "q":
+		m.mode = ModeIdeaView
 	}
 	return m, nil
 }

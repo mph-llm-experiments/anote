@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -132,6 +133,11 @@ func (m *Model) applyFilters() {
 		}
 		filtered = append(filtered, idea)
 	}
+	// Sort by modified descending (most recently touched first — "riffle through the deck")
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].ModTime.After(filtered[j].ModTime)
+	})
+
 	m.filtered = filtered
 	m.nav.SetMax(len(m.filtered))
 }

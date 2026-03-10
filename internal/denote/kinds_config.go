@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 const kindsConfigFilename = "kinds.json"
@@ -142,11 +143,12 @@ func (kc *KindsConfig) KindExists(kind string) bool {
 	return ok
 }
 
-// AllKinds returns all kind names in the config.
+// AllKinds returns all kind names in the config, sorted alphabetically.
 func (kc *KindsConfig) AllKinds() []string {
 	kinds := make([]string, 0, len(kc.Kinds))
 	for k := range kc.Kinds {
 		kinds = append(kinds, k)
 	}
+	sort.Strings(kinds)
 	return kinds
 }

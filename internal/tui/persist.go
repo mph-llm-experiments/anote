@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -35,6 +36,11 @@ func persistLogEntry(i *denote.Idea, entry string) error {
 // createIdea creates a new idea file and returns the parsed result.
 func createIdea(cfg *config.Config, title, kind string, tags []string) (*denote.Idea, error) {
 	return idea.CreateIdea(cfg.IdeasDirectory, title, tags, kind, "")
+}
+
+// deleteIdea removes the idea file from disk.
+func deleteIdea(i *denote.Idea) error {
+	return os.Remove(i.FilePath)
 }
 
 // refreshIdea re-reads the idea from disk, returning the fresh version.

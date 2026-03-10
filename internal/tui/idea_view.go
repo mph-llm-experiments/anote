@@ -78,6 +78,11 @@ func (m Model) viewIdeaDetail() string {
 		sb.WriteString(m.editBuf.Render())
 		sb.WriteString("\n")
 		sb.WriteString(acoreui.MutedStyle.Render("enter: save  esc: cancel"))
+	case ModeConfirmDelete:
+		sb.WriteString("\n")
+		sb.WriteString(acoreui.ErrorStyle.Render(fmt.Sprintf("Delete %q? This cannot be undone.", idea.Title)))
+		sb.WriteString("\n")
+		sb.WriteString(acoreui.MutedStyle.Render("y: delete  n/esc: cancel"))
 	}
 
 	// Footer
