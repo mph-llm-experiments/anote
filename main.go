@@ -6,6 +6,7 @@ import (
 
 	"github.com/mph-llm-experiments/anote/internal/cli"
 	"github.com/mph-llm-experiments/anote/internal/config"
+	"github.com/mph-llm-experiments/anote/internal/tui"
 )
 
 var version = "0.2.0"
@@ -23,6 +24,14 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
+	}
+
+	if len(os.Args) == 1 {
+		if err := tui.Run(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	if err := cli.Run(cfg, os.Args[1:]); err != nil {
