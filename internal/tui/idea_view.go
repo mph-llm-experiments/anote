@@ -173,7 +173,7 @@ func (m Model) viewCompliancePrompt() string {
 	return sb.String()
 }
 
-// viewCreate renders the new idea creation form.
+// viewCreate renders the new note creation form.
 func (m Model) viewCreate() string {
 	fieldLabel := lipgloss.NewStyle().
 		Bold(true).
@@ -181,16 +181,28 @@ func (m Model) viewCreate() string {
 
 	switch m.createField {
 	case 0:
-		return acoreui.HeaderStyle.Render("New idea") + "\n\n" +
+		return acoreui.HeaderStyle.Render("New note") + "\n\n" +
 			fieldLabel.Render("Title: ") + m.editBuf.Render() + "\n" +
 			acoreui.MutedStyle.Render("enter: next  esc: cancel")
 	case 1:
-		return acoreui.HeaderStyle.Render("New idea") + "\n\n" +
-			fieldLabel.Render("Title: ") + acoreui.BodyStyle.Render(m.createTitle) + "\n" +
-			fieldLabel.Render("Kind:  ") + m.editBuf.Render() + "\n" +
-			acoreui.MutedStyle.Render("tab: cycle  enter: next  esc: cancel")
+		var sb strings.Builder
+		sb.WriteString(acoreui.HeaderStyle.Render("New note") + "\n\n")
+		sb.WriteString(fieldLabel.Render("Title: ") + acoreui.BodyStyle.Render(m.createTitle) + "\n\n")
+		sb.WriteString(fieldLabel.Render("Kind:") + "\n")
+		kinds := m.kindsConfig.AllKinds()
+		for i, k := range kinds {
+			num := fmt.Sprintf("%d", i+1)
+			if k == m.createKind {
+				sb.WriteString(acoreui.SelectedStyle.Render(fmt.Sprintf("  %s) %s", num, k)) + "\n")
+			} else {
+				sb.WriteString(acoreui.MutedStyle.Render(fmt.Sprintf("  %s) %s", num, k)) + "\n")
+			}
+		}
+		sb.WriteString("\n")
+		sb.WriteString(acoreui.MutedStyle.Render("1-9: pick kind  enter: accept  esc: cancel"))
+		return sb.String()
 	default:
-		return acoreui.HeaderStyle.Render("New idea") + "\n\n" +
+		return acoreui.HeaderStyle.Render("New note") + "\n\n" +
 			fieldLabel.Render("Title: ") + acoreui.BodyStyle.Render(m.createTitle) + "\n" +
 			fieldLabel.Render("Kind:  ") + acoreui.BodyStyle.Render(m.createKind) + "\n" +
 			fieldLabel.Render("Tags:  ") + m.editBuf.Render() + "\n" +

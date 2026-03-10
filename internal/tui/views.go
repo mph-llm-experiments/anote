@@ -56,7 +56,7 @@ func (m Model) viewList() string {
 	}
 
 	if len(m.filtered) == 0 {
-		sb.WriteString(acoreui.MutedStyle.Render("  no ideas"))
+		sb.WriteString(acoreui.MutedStyle.Render("  no notes"))
 		sb.WriteString("\n")
 	}
 
@@ -65,7 +65,7 @@ func (m Model) viewList() string {
 }
 
 func (m Model) renderHeader() string {
-	count := fmt.Sprintf("%d ideas", len(m.filtered))
+	count := fmt.Sprintf("%d notes", len(m.filtered))
 	if len(m.filtered) != len(m.ideas) {
 		count = fmt.Sprintf("%d / %d", len(m.filtered), len(m.ideas))
 	}
@@ -135,7 +135,7 @@ func (m Model) viewHelp() string {
 		{Key: "t", Desc: "edit tags"},
 		{Key: "l", Desc: "add log entry"},
 		{Key: "r", Desc: "rename title"},
-		{Key: "x", Desc: "delete idea"},
+		{Key: "x", Desc: "delete note"},
 		{Key: "E", Desc: "open in $EDITOR"},
 	}
 	return acoreui.RenderHelp(bindings, m.width)

@@ -280,12 +280,9 @@ func (m Model) handleCreateKey(key string) (tea.Model, tea.Cmd) {
 				return m, nil // don't advance without a title
 			}
 			m.createField = 1
-			m.editBuf.SetValue(m.createKind)
+			m.editBuf.SetValue("")
 		} else if m.createField == 1 {
-			val := m.editBuf.Value()
-			if val != "" {
-				m.createKind = val
-			}
+			// enter on kind field accepts current selection and advances
 			m.createField = 2
 			m.editBuf.SetValue("")
 		} else {
@@ -311,21 +308,18 @@ func (m Model) handleCreateKey(key string) (tea.Model, tea.Cmd) {
 			// Open in editor so user can write the body immediately.
 			return m, openInEditor(created.FilePath)
 		}
-	case "tab":
-		// Cycle through available kinds when on kind field
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		// On kind field, number keys select directly
 		if m.createField == 1 {
 			kinds := m.kindsConfig.AllKinds()
-			current := m.editBuf.Value()
-			for i, k := range kinds {
-				if k == current {
-					if i+1 < len(kinds) {
-						m.editBuf.SetValue(kinds[i+1])
-					} else {
-						m.editBuf.SetValue(kinds[0])
-					}
-					break
-				}
+			idx := int(key[0]-'1')
+			if idx >= 0 && idx < len(kinds) {
+				m.createKind = kinds[idx]
+				// Advance immediately to tags
+				m.createField = 2
+				m.editBuf.SetValue("")
 			}
+			return m, nil
 		}
 	case "esc":
 		m.mode = ModeNormal
