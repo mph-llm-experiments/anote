@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -20,8 +21,13 @@ func persistIdeaFrontmatter(idea *denote.Idea) error {
 // It re-reads the file first to extract the current body content, then writes
 // the full file back with the log entry appended.
 func persistLogEntry(i *denote.Idea, entry string) error {
-	existingContent := extractContent(i.Content)
-	newContent := appendLogEntry(existingContent, entry)
+	// Re-read the file to get current content (avoids overwriting out-of-band edits)
+	fresh, err := denote.ParseIdeaFile(i.FilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read idea: %w", err)
+	}
+	content := extractContent(fresh.Content)
+	newContent := appendLogEntry(content, entry)
 	i.Modified = time.Now().Format(time.RFC3339)
 	return denote.WriteIdeaFile(i.FilePath, i, newContent)
 }

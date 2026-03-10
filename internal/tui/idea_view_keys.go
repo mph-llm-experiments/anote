@@ -9,9 +9,14 @@ import (
 func (m Model) handleIdeaViewKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "q", "esc":
-		m.mode = ModeNormal
-		m.viewingIdea = nil
-		m.editingField = ""
+		if m.editingField != "" {
+			// Cancel inline edit without leaving idea view
+			m.editingField = ""
+			m.editBuf.Clear()
+		} else {
+			m.mode = ModeNormal
+			m.viewingIdea = nil
+		}
 
 	case "s":
 		// Open kind-aware state picker
