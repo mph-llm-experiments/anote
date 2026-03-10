@@ -177,7 +177,7 @@ func ValidateIdea(idea *Idea) error {
 	}
 
 	if idea.Kind != "" && !IsValidKind(idea.Kind) {
-		return fmt.Errorf("invalid kind: %s (use aspiration, belief, plan, note, or fact)", idea.Kind)
+		return fmt.Errorf("invalid kind: %s (use aspiration, belief, plan, note, fact, or purpose)", idea.Kind)
 	}
 
 	if idea.Maturity != "" && !IsValidMaturity(idea.Maturity) {
