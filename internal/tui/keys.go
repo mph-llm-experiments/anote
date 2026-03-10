@@ -3,6 +3,7 @@ package tui
 import (
 	"os"
 	"os/exec"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -192,12 +193,18 @@ func (m Model) handleMenuKey(key string) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if m.viewingIdea != nil && m.menuCursor < len(m.menuOptions) {
-			// Dispatch to field-specific handler based on menuField
 			selected := m.menuOptions[m.menuCursor]
 			switch m.menuField {
 			case FieldState:
 				m.viewingIdea.State = selected
-				// TODO Task 10: persist to file
+				if err := persistIdeaFrontmatter(m.viewingIdea); err != nil {
+					m.statusMsg = "error saving state: " + err.Error()
+				} else {
+					if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+						m.viewingIdea = fresh
+					}
+					_ = m.loadIdeas()
+				}
 			case FieldPurpose:
 				if selected == "" {
 					m.viewingIdea.PurposeID = ""
@@ -206,7 +213,14 @@ func (m Model) handleMenuKey(key string) (tea.Model, tea.Cmd) {
 					m.viewingIdea.PurposeID = selected
 					m.viewingIdea.PurposeName = m.purposeNameFor(selected)
 				}
-				// TODO Task 10: persist to file
+				if err := persistIdeaFrontmatter(m.viewingIdea); err != nil {
+					m.statusMsg = "error saving purpose: " + err.Error()
+				} else {
+					if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+						m.viewingIdea = fresh
+					}
+					_ = m.loadIdeas()
+				}
 			}
 		}
 		m.mode = ModeIdeaView
@@ -229,7 +243,14 @@ func (m Model) handleComplianceKey(key string) (tea.Model, tea.Cmd) {
 	case "enter":
 		if m.viewingIdea != nil && m.complianceCursor < len(m.complianceOptions) {
 			m.viewingIdea.State = m.complianceOptions[m.complianceCursor]
-			// TODO Task 10: persist to file
+			if err := persistIdeaFrontmatter(m.viewingIdea); err != nil {
+				m.statusMsg = "error saving state: " + err.Error()
+			} else {
+				if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+					m.viewingIdea = fresh
+				}
+				_ = m.loadIdeas()
+			}
 		}
 		m.mode = ModeIdeaView
 	case "esc", "q":
@@ -258,7 +279,20 @@ func (m Model) handleCreateKey(key string) (tea.Model, tea.Cmd) {
 			m.editBuf.SetValue("")
 		} else {
 			m.createTags = m.editBuf.Value()
-			// TODO Task 10: save idea
+			// Parse space-separated tags
+			var tags []string
+			for _, t := range strings.Fields(m.createTags) {
+				if t != "" {
+					tags = append(tags, t)
+				}
+			}
+			created, err := createIdea(m.cfg, m.createTitle, m.createKind, tags)
+			if err != nil {
+				m.statusMsg = "error creating idea: " + err.Error()
+			} else {
+				m.statusMsg = "Created: " + created.Title
+				_ = m.loadIdeas()
+			}
 			m.mode = ModeNormal
 			m.editBuf.Clear()
 		}
@@ -294,7 +328,17 @@ func (m Model) handleCreateKey(key string) (tea.Model, tea.Cmd) {
 func (m Model) handleLogEntryKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "enter":
-		// TODO Task 10: append log entry to file
+		entry := m.logBuf.Value()
+		if entry != "" && m.viewingIdea != nil {
+			if err := persistLogEntry(m.viewingIdea, entry); err != nil {
+				m.statusMsg = "error saving log: " + err.Error()
+			} else {
+				if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+					m.viewingIdea = fresh
+				}
+				_ = m.loadIdeas()
+			}
+		}
 		m.logBuf.Clear()
 		m.mode = ModeIdeaView
 	case "esc":
@@ -313,7 +357,24 @@ func (m Model) handleLogEntryKey(key string) (tea.Model, tea.Cmd) {
 func (m Model) handleTagsEditKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "enter":
-		// TODO Task 10: parse and save tags
+		if m.viewingIdea != nil {
+			// Parse space-separated tags and update frontmatter
+			var newTags []string
+			for _, t := range strings.Fields(m.editBuf.Value()) {
+				if t != "" {
+					newTags = append(newTags, t)
+				}
+			}
+			m.viewingIdea.Tags = newTags
+			if err := persistIdeaFrontmatter(m.viewingIdea); err != nil {
+				m.statusMsg = "error saving tags: " + err.Error()
+			} else {
+				if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+					m.viewingIdea = fresh
+				}
+				_ = m.loadIdeas()
+			}
+		}
 		m.mode = ModeIdeaView
 	case "esc":
 		m.mode = ModeIdeaView
@@ -336,4 +397,3 @@ func openInEditor(filePath string) tea.Cmd {
 	c := exec.Command(editor, filePath)
 	return tea.ExecProcess(c, nil)
 }
-

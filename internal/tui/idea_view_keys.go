@@ -52,7 +52,14 @@ func (m Model) handleIdeaViewKey(key string) (tea.Model, tea.Cmd) {
 			default:
 				m.viewingIdea.Maturity = ""
 			}
-			// TODO Task 10: persist to file
+			if err := persistIdeaFrontmatter(m.viewingIdea); err != nil {
+				m.statusMsg = "error saving maturity: " + err.Error()
+			} else {
+				if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+					m.viewingIdea = fresh
+				}
+				_ = m.loadIdeas()
+			}
 		}
 
 	case "K":
@@ -69,7 +76,14 @@ func (m Model) handleIdeaViewKey(key string) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			// TODO Task 10: persist to file
+			if err := persistIdeaFrontmatter(m.viewingIdea); err != nil {
+				m.statusMsg = "error saving kind: " + err.Error()
+			} else {
+				if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+					m.viewingIdea = fresh
+				}
+				_ = m.loadIdeas()
+			}
 		}
 
 	case "t":
@@ -94,7 +108,14 @@ func (m Model) handleIdeaViewKey(key string) (tea.Model, tea.Cmd) {
 			newTitle := m.editBuf.Value()
 			if newTitle != "" {
 				m.viewingIdea.Title = newTitle
-				// TODO Task 10: persist to file
+				if err := persistIdeaFrontmatter(m.viewingIdea); err != nil {
+					m.statusMsg = "error saving title: " + err.Error()
+				} else {
+					if fresh, err := refreshIdea(m.viewingIdea); err == nil {
+						m.viewingIdea = fresh
+					}
+					_ = m.loadIdeas()
+				}
 			}
 			m.editingField = ""
 			m.editBuf.Clear()

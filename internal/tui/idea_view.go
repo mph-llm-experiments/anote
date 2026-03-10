@@ -17,8 +17,12 @@ func (m Model) viewIdeaDetail() string {
 	idea := m.viewingIdea
 	var sb strings.Builder
 
-	// Title (highlighted)
-	sb.WriteString(acoreui.SelectedStyle.Render(idea.Title))
+	// Title — show edit buffer when renaming
+	if m.editingField == FieldTitle {
+		sb.WriteString(acoreui.SelectedStyle.Render(m.editBuf.Render()))
+	} else {
+		sb.WriteString(acoreui.SelectedStyle.Render(idea.Title))
+	}
 	sb.WriteString("\n\n")
 
 	// Metadata fields
@@ -86,7 +90,6 @@ func (m Model) viewIdeaDetail() string {
 }
 
 // renderMetaField renders a label: value metadata line.
-// editingField comparison is for future inline edit highlighting.
 func (m Model) renderMetaField(label, value, _ string) string {
 	labelStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -97,22 +100,45 @@ func (m Model) renderMetaField(label, value, _ string) string {
 	)
 }
 
-// viewStateMenu renders the kind-aware state picker overlay.
+// viewStateMenu renders the kind-aware state picker overlay (also handles purpose picker).
 func (m Model) viewStateMenu() string {
 	if m.viewingIdea == nil {
 		return ""
 	}
 	var sb strings.Builder
-	sb.WriteString(acoreui.HeaderStyle.Render("Choose state:"))
-	sb.WriteString("\n")
-	for i, s := range m.menuOptions {
-		display := denote.DisplayState(s, m.viewingIdea.Kind)
-		if i == m.menuCursor {
-			sb.WriteString(acoreui.SelectedStyle.Render("  → " + display))
-		} else {
-			sb.WriteString(acoreui.MutedStyle.Render("    " + display))
-		}
+
+	if m.menuField == FieldPurpose {
+		sb.WriteString(acoreui.HeaderStyle.Render("Choose purpose:"))
 		sb.WriteString("\n")
+		for i, opt := range m.menuOptions {
+			var display string
+			if opt == "" {
+				display = "(unattached)"
+			} else {
+				display = m.purposeNameFor(opt)
+				if display == "" {
+					display = opt // fallback to raw ID if not found
+				}
+			}
+			if i == m.menuCursor {
+				sb.WriteString(acoreui.SelectedStyle.Render("  → " + display))
+			} else {
+				sb.WriteString(acoreui.MutedStyle.Render("    " + display))
+			}
+			sb.WriteString("\n")
+		}
+	} else {
+		sb.WriteString(acoreui.HeaderStyle.Render("Choose state:"))
+		sb.WriteString("\n")
+		for i, s := range m.menuOptions {
+			display := denote.DisplayState(s, m.viewingIdea.Kind)
+			if i == m.menuCursor {
+				sb.WriteString(acoreui.SelectedStyle.Render("  → " + display))
+			} else {
+				sb.WriteString(acoreui.MutedStyle.Render("    " + display))
+			}
+			sb.WriteString("\n")
+		}
 	}
 	sb.WriteString(acoreui.MutedStyle.Render("j/k: move  enter: select  esc: cancel"))
 	return sb.String()
@@ -143,7 +169,6 @@ func (m Model) viewCompliancePrompt() string {
 }
 
 // viewCreate renders the new idea creation form.
-// (Stub for Task 10 — create_view.go will provide the full implementation.)
 func (m Model) viewCreate() string {
 	fieldLabel := lipgloss.NewStyle().
 		Bold(true).
