@@ -156,8 +156,3 @@ func (m *Model) purposeNameFor(purposeID string) string {
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return nil }
 
-// Update implements tea.Model — stubbed here, filled in by keys.go.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return m, nil
-}
-
