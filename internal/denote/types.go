@@ -34,6 +34,7 @@ const (
 	KindPlan       = "plan"
 	KindNote       = "note"
 	KindFact       = "fact"
+	KindPurpose    = "purpose"
 )
 
 // Type constant.
@@ -47,6 +48,8 @@ type IdeaMetadata struct {
 	State          string `yaml:"state,omitempty" json:"state,omitempty"`
 	Maturity       string `yaml:"maturity,omitempty" json:"maturity,omitempty"`
 	RejectedReason string `yaml:"rejected_reason,omitempty" json:"rejected_reason,omitempty"`
+	PurposeID      string `yaml:"purpose_id,omitempty" json:"purpose_id,omitempty"`
+	PurposeName    string `yaml:"purpose_name,omitempty" json:"purpose_name,omitempty"`
 }
 
 // Idea combines acore.Entity with idea-specific metadata and content.
@@ -113,16 +116,16 @@ func ValidateStateTransition(from, to string) error {
 // IsValidKind checks if a kind value is valid.
 func IsValidKind(kind string) bool {
 	switch kind {
-	case KindAspiration, KindBelief, KindPlan, KindNote, KindFact:
+	case KindAspiration, KindBelief, KindPlan, KindNote, KindFact, KindPurpose:
 		return true
 	}
 	return false
 }
 
-// IsSimpleKind returns true for kinds that skip the full lifecycle (note, fact).
+// IsSimpleKind returns true for kinds that skip the full lifecycle (note, fact, purpose).
 // Simple kinds only support active and archived states, and do not use maturity.
 func IsSimpleKind(kind string) bool {
-	return kind == KindNote || kind == KindFact
+	return kind == KindNote || kind == KindFact || kind == KindPurpose
 }
 
 // displayLabels maps canonical states to kind-specific display labels.

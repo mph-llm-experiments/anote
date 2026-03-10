@@ -214,6 +214,44 @@ func TestResolveDisplayState(t *testing.T) {
 	}
 }
 
+func TestIsValidKind_Purpose(t *testing.T) {
+	if !IsValidKind(KindPurpose) {
+		t.Error("expected 'purpose' to be a valid kind")
+	}
+}
+
+func TestIsValidKind_Unknown(t *testing.T) {
+	if IsValidKind("unknown_kind") {
+		t.Error("expected unknown kind to be invalid")
+	}
+}
+
+func TestIdeaMetadata_PurposeFields(t *testing.T) {
+	m := IdeaMetadata{
+		PurposeID:   "01KKC45W4ZC3W7S12ZFC1JMP5F",
+		PurposeName: "photography",
+	}
+	if m.PurposeID == "" {
+		t.Error("expected PurposeID to be set")
+	}
+	if m.PurposeName == "" {
+		t.Error("expected PurposeName to be set")
+	}
+}
+
+func TestIsSimpleKind_Purpose(t *testing.T) {
+	if !IsSimpleKind(KindPurpose) {
+		t.Error("expected purpose to be a simple kind (active/archived only)")
+	}
+}
+
+func TestDisplayState_PurposeKind(t *testing.T) {
+	label := DisplayState("active", KindPurpose)
+	if label != "active" {
+		t.Errorf("expected 'active' for purpose kind, got %q", label)
+	}
+}
+
 func TestValidateIdea_Kind(t *testing.T) {
 	// Valid kind
 	i := &Idea{}
